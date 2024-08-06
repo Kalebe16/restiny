@@ -1,0 +1,11 @@
+# Dev requirements
+blue==0.9.1
+isort==5.13.2
+textual-dev==1.6.1
+
+# Requirements
+textual==0.85.2
+textual[syntax]
+httpx==0.27.2
+pyperclip==1.9.0
+

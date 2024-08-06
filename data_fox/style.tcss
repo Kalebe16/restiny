@@ -1,0 +1,21 @@
+Button {
+    min-width: 0%;
+    max-width: 100%;
+}
+
+.h-full {
+    height: 100%;
+}
+
+.w-full {
+    width: 100%;
+}
+
+.w-0 {
+    width: 0%;
+}
+
+.hidden {
+    display: none;
+}
+
