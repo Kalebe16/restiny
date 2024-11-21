@@ -376,6 +376,7 @@ class DataFoxApp(App, inherit_bindings=False):
                 timeout=100,
             )
         except httpx.RequestError as error:
+
             self.notify(
                 f'{type(error).__name__}: {str(error)}', severity='error'
             )
