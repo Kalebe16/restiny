@@ -1,0 +1,93 @@
+name: CI Workflow
+
+on:
+  push
+
+jobs:
+  check-lint:
+    name: Linting and formatting checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12.1'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r ./requirements.dev.txt
+
+      - name: Check lint
+        run: |
+          ruff format .
+          ruff check .
+
+  build-python-package:
+    name: Build python package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12.1'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r ./requirements.dev.txt
+
+      - name: Build package
+        run: |
+          python -m build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: restiny
+          path: dist/restiny*
+
+  build-executable:
+    name: Build executables for Linux, macOS, and Windows
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12.1'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        shell: bash
+        run: |
+          pyinstaller --onefile --console --name restiny --add-data "restiny/assets:assets" --collect-data textual --collect-submodules textual.widgets --collect-all tree_sitter --collect-all tree_sitter_bash --collect-all tree_sitter_css --collect-all tree_sitter_go --collect-all tree_sitter_html --collect-all tree_sitter_java --collect-all tree_sitter_javascript --collect-all tree_sitter_json --collect-all tree_sitter_markdown --collect-all tree_sitter_python --collect-all tree_sitter_regex --collect-all tree_sitter_rust --collect-all tree_sitter_sql --collect-all tree_sitter_toml --collect-all tree_sitter_xml --collect-all tree_sitter_yaml ./restiny/__main__.py
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: restiny-${{ matrix.os == 'ubuntu-latest' && 'linux' || matrix.os == 'macos-latest' && 'macos' || matrix.os == 'windows-latest' && 'windows' }}
+          path: dist/restiny*
+          compression-level: 9
+          if-no-files-found: error
+

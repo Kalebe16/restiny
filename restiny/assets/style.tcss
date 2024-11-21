@@ -1,0 +1,73 @@
+Button {
+    min-width: 0%;
+    max-width: 100%;
+}
+
+.hidden {
+    display: none;
+}
+
+.w-auto {
+    width: auto;
+}
+
+.w-1fr {
+    width: 1fr;
+}
+
+.w-2fr {
+    width: 2fr;
+}
+
+.h-auto {
+    height: auto;
+}
+
+.h-1fr {
+    height: 1fr;
+}
+
+.h-2fr {
+    width: 2fr;
+}
+
+.p-0 {
+    padding: 0;
+}
+
+.pt-1 {
+    padding-top: 1;
+}
+
+.pl-1 {
+    padding-left: 1;
+}
+
+.pr-1 {
+    padding-right: 1;
+}
+
+.pb-1 {
+    padding-bottom: 1;
+}
+
+.m {
+    margin: 0;
+}
+
+.mt-1 {
+    margin-top: 1;
+}
+
+.ml-1 {
+    margin-left: 1;
+}
+
+.mr-1 {
+    margin-right: 1;
+}
+
+.mb-1 {
+    margin-bottom: 1;
+}
+
