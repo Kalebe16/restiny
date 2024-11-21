@@ -1,0 +1,75 @@
+#############
+## Package ##
+#############
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "restiny"
+dynamic = ["version"]
+description = "A minimalist HTTP client, no bullshit"
+authors = [{ name = "Kalebe Chimanski de Almeida", email = "kalebe.chi.almeida@gmail.com" }]
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.8"
+dependencies = [
+  "textual>=6.2,<6.3",
+  "textual[syntax]",
+  "httpx>=0.28,<0.29",
+  "pyperclip>=1.9,<1.10",
+]
+keywords = ["restiny", "tui", "http", "client", "terminal", "api", "testing", "textual", "cli", "developer-tool"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Environment :: Console",
+    "Typing :: Typed",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Operating System :: Microsoft :: Windows :: Windows 11",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Natural Language :: English",
+]
+
+[project.urls]
+Homepage = "https://github.com/Kalebe16/restiny"
+Repository = "https://github.com/Kalebe16/restiny"
+Issues = "https://github.com/Kalebe16/restiny/issues"
+Documentation = "https://github.com/Kalebe16/restiny/blob/main/README.md"
+
+[project.scripts]
+restiny = "restiny.__main__:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "restiny.__about__.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["restiny*"]
+
+[tool.setuptools.package-data]
+restiny = ["assets/**/*"]
+
+##########
+## Ruff ##
+##########
+[tool.ruff]
+line-length = 79
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I", "UP"]
+ignore = ["E501", "B006"]
+
+[tool.ruff.format]
+quote-style = "single"
