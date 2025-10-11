@@ -1,8 +1,8 @@
 ![OS support](https://img.shields.io/badge/OS-macOS%20Linux%20Windows-red)
-![Python versions](https://img.shields.io/badge/Python-3.8%20|%203.9%20|%203.10%20|%203.11%20|%203.12%20|%203.13-blue)
+![Python versions](https://img.shields.io/badge/Python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)
 
 
-- [Restiny](#restiny)
+- [RESTiny](#restiny)
   - [How to install](#how-to-install)
   - [How to install (Alternative: Download pre-built executables)](#how-to-install-alternative-download-pre-built-executables)
   - [How to run](#how-to-run)
@@ -11,7 +11,7 @@
 - [Why??](#why)
 
 
-# Restiny
+# RESTiny
 
 _A minimal, elegant HTTP client for Python — with a TUI interface powered by [Textual](https://github.com/Textualize/textual)._
 
