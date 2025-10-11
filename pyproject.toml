@@ -14,7 +14,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
-  "textual>=6.2,<6.3",
+  "textual>=6.3,<6.4",
   "textual[syntax]",
   "httpx>=0.28,<0.29",
   "pyperclip>=1.9,<1.10",
@@ -31,6 +31,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
     "Operating System :: Microsoft :: Windows :: Windows 10",
@@ -63,11 +64,11 @@ restiny = ["assets/**/*"]
 ##########
 [tool.ruff]
 line-length = 79
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "I", "UP"]
-ignore = ["E501", "B006"]
+ignore = ["E501", "B006", "UP037"]
 
 [tool.ruff.format]
 quote-style = "single"
