@@ -15,7 +15,7 @@
 
 _A minimal, elegant HTTP client for Python — with a TUI interface powered by [Textual](https://github.com/Textualize/textual)._
 
-<img width="1905" alt="image" src="https://github.com/user-attachments/assets/e6f0c03a-e98e-40cd-af1d-38489d650fb1" />
+![image](https://github.com/user-attachments/assets/e6f0c03a-e98e-40cd-af1d-38489d650fb1)
 
 ## How to install
 
