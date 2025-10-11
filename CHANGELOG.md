@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.2.0] - 2025-10-11
+
+### Added
+
+- Added python3.14 support
+- Added pipeline to publish Python package
+
+### Changed
+
+- Adjusted README image rendering for PyPI compatibility.
+
 ## [0.1.2] - 2025-10-11
 
 ### Fixed
