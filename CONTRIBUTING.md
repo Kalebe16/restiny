@@ -1,7 +1,12 @@
 ## How to configure environment
+
+> You must have `pyenv` installed.
+
 ```bash
 cd restiny
-pyenv local 3.13
+pyenv update
+pyenv install 3.14
+pyenv local 3.14
 python3 -m venv venv
 ./venv/bin/activate
 pip install -r requirements.txt
