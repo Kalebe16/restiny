@@ -1,4 +1,3 @@
-import mimetypes
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,10 +18,11 @@ from textual.widgets import (
 from restiny.enums import BodyMode, BodyRawLanguage
 from restiny.widgets import (
     CustomTextArea,
-    DynamicField,
     DynamicFields,
     PathChooser,
+    TextDynamicField,
 )
+from restiny.widgets.dynamic_fields import TextOrFileDynamicField
 
 
 @dataclass
@@ -98,12 +98,12 @@ class RequestArea(Static):
         with TabbedContent():
             with TabPane('Headers'):
                 yield DynamicFields(
-                    fields=[DynamicField(enabled=False, key='', value='')],
+                    fields=[TextDynamicField(enabled=False, key='', value='')],
                     id='headers',
                 )
             with TabPane('Query params'):
                 yield DynamicFields(
-                    fields=[DynamicField(enabled=False, key='', value='')],
+                    fields=[TextDynamicField(enabled=False, key='', value='')],
                     id='params',
                 )
             with TabPane('Body'):
@@ -114,7 +114,7 @@ class RequestArea(Static):
                             ('Raw', BodyMode.RAW),
                             ('File', BodyMode.FILE),
                             ('Form (urlencoded)', BodyMode.FORM_URLENCODED),
-                            # ('Form (multipart)', BodyMode.FORM_MULTIPART)
+                            ('Form (multipart)', BodyMode.FORM_MULTIPART),
                         ),
                         allow_blank=False,
                         tooltip='Body type',
@@ -149,8 +149,23 @@ class RequestArea(Static):
                         id='body-mode-form-urlencoded', classes='h-auto mt-1'
                     ):
                         yield DynamicFields(
-                            [DynamicField(enabled=False, key='', value='')],
+                            [
+                                TextDynamicField(
+                                    enabled=False, key='', value=''
+                                )
+                            ],
                             id='body-form-urlencoded',
+                        )
+                    with Horizontal(
+                        id='body-mode-form-multipart', classes='h-auto mt-1'
+                    ):
+                        yield DynamicFields(
+                            [
+                                TextOrFileDynamicField(
+                                    enabled=False, key='', value=''
+                                )
+                            ],
+                            id='body-form-multipart',
                         )
 
             with TabPane('Options'):
@@ -187,6 +202,9 @@ class RequestArea(Static):
         self.body_form_urlencoded_fields = self.query_one(
             '#body-form-urlencoded', DynamicFields
         )
+        self.body_form_multipart_fields = self.query_one(
+            '#body-form-multipart', DynamicFields
+        )
 
         self.options_timeout_input = self.query_one('#options-timeout', Input)
         self.options_follow_redirects_switch = self.query_one(
@@ -204,6 +222,8 @@ class RequestArea(Static):
             self.body_mode_switcher.current = 'body-mode-raw'
         elif message.value == BodyMode.FORM_URLENCODED:
             self.body_mode_switcher.current = 'body-mode-form-urlencoded'
+        elif message.value == BodyMode.FORM_MULTIPART:
+            self.body_mode_switcher.current = 'body-mode-form-multipart'
 
     @on(Select.Changed, '#body-raw-language')
     def on_change_body_text_language(self, message: Select.Changed) -> None:
@@ -224,30 +244,6 @@ class RequestArea(Static):
             self.body_enabled_switch.value = False
         else:
             self.body_enabled_switch.value = True
-
-    @on(PathChooser.Changed)
-    async def on_change_file(self, message: PathChooser.Changed) -> None:
-        content_type_header_field: DynamicField | None = None
-        for header_field in self.header_fields.fields:
-            if header_field.key.lower() == 'content-type':
-                content_type_header_field = header_field
-                break
-
-        content_type: str | None = mimetypes.guess_type(str(message.path))[0]
-        if not content_type:
-            return
-
-        if content_type_header_field:
-            content_type_header_field.value = content_type
-            return
-
-        empty_field = self.header_fields.empty_fields[0]
-        empty_field.enabled = True
-        empty_field.key = 'Content-Type'
-        empty_field.value = content_type
-        await self.header_fields.add_field(
-            field=DynamicField(enabled=False, key='', value='')
-        )
 
     @on(Input.Changed, '#options-timeout')
     def on_change_timeout(self, message: Input.Changed) -> None:
@@ -303,6 +299,16 @@ class RequestArea(Static):
                             value=form_item['value'],
                         )
                     )
+            elif body_type == BodyMode.FORM_MULTIPART:
+                payload = []
+                for form_item in self.body_form_multipart_fields.values:
+                    payload.append(
+                        FormMultipartField(
+                            enabled=form_item['enabled'],
+                            key=form_item['key'],
+                            value=form_item['value'],
+                        )
+                    )
 
             return RequestAreaData.Body(
                 enabled=body_send,
@@ -330,6 +336,3 @@ class RequestArea(Static):
             body=get_body(),
             options=get_options(),
         )
-
-    def set_content_type() -> None:
-        raise NotImplementedError()

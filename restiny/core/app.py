@@ -237,10 +237,11 @@ class RESTinyApp(App, inherit_bindings=False):
                         )
                     elif request_area_data.body.type == BodyMode.FILE:
                         file = request_area_data.body.payload
-                        headers['content-type'] = (
-                            mimetypes.guess_type(file.name)[0]
-                            or 'application/octet-stream'
-                        )
+                        if 'content-type' not in headers:
+                            headers['content-type'] = (
+                                mimetypes.guess_type(file.name)[0]
+                                or 'application/octet-stream'
+                            )
                         request = http_client.build_request(
                             method=url_area_data.method,
                             url=url_area_data.url,

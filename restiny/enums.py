@@ -39,6 +39,5 @@ class ContentType(StrEnum):
     JSON = 'application/json'
     YAML = 'application/x-yaml'
     XML = 'application/xml'
-
     FORM_URLENCODED = 'application/x-www-form-urlencoded'
     FORM_MULTIPART = 'multipart/form-data'
