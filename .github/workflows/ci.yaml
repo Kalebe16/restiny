@@ -107,11 +107,30 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-24.04
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+          - os: windows-2022
+            arch: amd64
+          - os: windows-11-arm
+            arch: arm64
+          - os: macos-13
+            arch: amd64
+          - os: macos-latest
+            arch: arm64
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Resolve version
+        shell: bash
+        run: |
+          VERSION=$(cat ./restiny/__about__.py | grep "__version__" | grep -Eo "[0-9]+\.[0-9]+(\.[0-9]+)?" | head -n1)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Resolved version: $VERSION"
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -127,12 +146,35 @@ jobs:
       - name: Build executable
         shell: bash
         run: |
-          pyinstaller --onefile --console --name restiny --add-data "restiny/assets:assets" --collect-data textual --collect-submodules textual.widgets --collect-all tree_sitter --collect-all tree_sitter_bash --collect-all tree_sitter_css --collect-all tree_sitter_go --collect-all tree_sitter_html --collect-all tree_sitter_java --collect-all tree_sitter_javascript --collect-all tree_sitter_json --collect-all tree_sitter_markdown --collect-all tree_sitter_python --collect-all tree_sitter_regex --collect-all tree_sitter_rust --collect-all tree_sitter_sql --collect-all tree_sitter_toml --collect-all tree_sitter_xml --collect-all tree_sitter_yaml ./restiny/__main__.py
+          pyinstaller \
+            --onefile \
+            --console \
+            --name restiny \
+            --add-data "restiny/assets:assets" \
+            --collect-data textual \
+            --collect-submodules textual.widgets \
+            --collect-all tree_sitter \
+            --collect-all tree_sitter_bash \
+            --collect-all tree_sitter_css \
+            --collect-all tree_sitter_go \
+            --collect-all tree_sitter_html \
+            --collect-all tree_sitter_java \
+            --collect-all tree_sitter_javascript \
+            --collect-all tree_sitter_json \
+            --collect-all tree_sitter_markdown \
+            --collect-all tree_sitter_python \
+            --collect-all tree_sitter_regex \
+            --collect-all tree_sitter_rust \
+            --collect-all tree_sitter_sql \
+            --collect-all tree_sitter_toml \
+            --collect-all tree_sitter_xml \
+            --collect-all tree_sitter_yaml \
+            ./restiny/__main__.py
 
       - name: Upload executables
         uses: actions/upload-artifact@v4
         with:
-          name: restiny-${{ matrix.os == 'ubuntu-latest' && 'linux' || matrix.os == 'macos-latest' && 'macos' || matrix.os == 'windows-latest' && 'windows' }}
+          name: restiny-v${{ env.VERSION }}-${{ startsWith(matrix.os, 'ubuntu') && 'linux' || startsWith(matrix.os, 'windows') && 'windows' || startsWith(matrix.os, 'macos') && 'macos' }}-${{ matrix.arch }}
           path: dist/restiny*
           compression-level: 9
           if-no-files-found: error
