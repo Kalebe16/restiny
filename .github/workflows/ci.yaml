@@ -1,12 +1,34 @@
-name: CI Workflow
+name: CI
 
 on:
-  push
+  push:
+
+env:
+  PYTHON_VERSION: "3.14"
 
 jobs:
-  check-lint:
-    name: Linting and formatting checks
+  verify-version:
+    name: Verify version
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Ensure version is not already published on PyPi
+        run: |
+          VERSION=$(cat ./restiny/__about__.py | grep "__version__" | grep -Eo "[0-9]+\.[0-9]+(\.[0-9]+)?" | head -n1)
+          if curl -sSf -o /dev/null "https://pypi.org/pypi/restiny/${VERSION}/json"; then
+            echo "Version ${VERSION} already exists on PyPI"
+            exit 1
+          else
+            echo "Version ${VERSION} does not exist on PyPI yet"
+          fi
+
+  lint-format:
+    name: Linting && formatting checks
+    runs-on: ubuntu-latest
+    needs: [verify-version]
 
     steps:
       - name: Check out repository
@@ -15,7 +37,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12.1'
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |
@@ -24,13 +46,13 @@ jobs:
 
       - name: Check lint
         run: |
-          ruff format .
+          ruff format --check .
           ruff check .
 
-  build-python-package:
-    name: Build python package
+  build-pkg:
+    name: Build package
     runs-on: ubuntu-latest
-    needs: [check-lint]
+    needs: [lint-format]
 
     steps:
       - name: Check out repository
@@ -39,7 +61,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12.1'
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |
@@ -56,39 +78,25 @@ jobs:
           name: restiny
           path: dist/restiny*
 
-  build-executable:
-    name: Build executables for Linux, macOS, and Windows
-    runs-on: ${{ matrix.os }}
-    needs: [check-lint]
-
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+  publish-pkg:
+    name: Publish package on PyPi
+    runs-on: ubuntu-latest
+    needs: [build-pkg]
+    if: github.ref_name == 'main'
+    permissions:
+      id-token: write
+      contents: read
+    environment:
+      name: pypi-publish
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/download-artifact@v4
         with:
-          python-version: '3.12.1'
+          name: restiny
+          path: dist
 
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Build executable
-        shell: bash
-        run: |
-          pyinstaller --onefile --console --name restiny --add-data "restiny/assets:assets" --collect-data textual --collect-submodules textual.widgets --collect-all tree_sitter --collect-all tree_sitter_bash --collect-all tree_sitter_css --collect-all tree_sitter_go --collect-all tree_sitter_html --collect-all tree_sitter_java --collect-all tree_sitter_javascript --collect-all tree_sitter_json --collect-all tree_sitter_markdown --collect-all tree_sitter_python --collect-all tree_sitter_regex --collect-all tree_sitter_rust --collect-all tree_sitter_sql --collect-all tree_sitter_toml --collect-all tree_sitter_xml --collect-all tree_sitter_yaml ./restiny/__main__.py
-
-      - name: Upload executables
-        uses: actions/upload-artifact@v4
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          name: restiny-${{ matrix.os == 'ubuntu-latest' && 'linux' || matrix.os == 'macos-latest' && 'macos' || matrix.os == 'windows-latest' && 'windows' }}
-          path: dist/restiny*
-          compression-level: 9
-          if-no-files-found: error
+          skip-existing: false
+
