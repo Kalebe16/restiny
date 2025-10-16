@@ -184,29 +184,41 @@ class DirectoryChooserScreen(PathChooserScreen):
 class PathChooser(Widget):
     DEFAULT_CSS = """
     PathChooser {
-        height: auto;
-        width: auto;
-    }
-
-    Input {
         width: 1fr;
+        height: auto;
+        layout: grid;
+        grid-size: 2 1;
+        grid-columns: 1fr auto;
     }
 
-    Button {
-        width: auto;
+    PathChooser > Input {
+        margin-right: 0;
+        border-right: none;
+    }
+
+    PathChooser > Button {
+        margin-left: 0;
+        border-left: none;
     }
     """
 
-    path: Reactive[Path | None] = Reactive(None, init=True)
+    path: Reactive[Path | None] = Reactive(None)
 
     class Changed(Message):
         """
         Sent when the user change the selected path.
         """
 
-        def __init__(self, path: Path | None) -> None:
+        def __init__(
+            self, path_chooser: PathChooser, path: Path | None
+        ) -> None:
             super().__init__()
+            self.path_chooser = path_chooser
             self.path = path
+
+        @property
+        def control(self) -> 'PathChooser':
+            return self.path_chooser
 
     @classmethod
     def file(cls, *args, **kwargs) -> 'PathChooser':
@@ -217,19 +229,31 @@ class PathChooser(Widget):
         return cls(*args, **kwargs, path_type='directory')
 
     def __init__(
-        self, path_type: Literal['file', 'directory'], *args, **kwargs
+        self,
+        path_type: Literal['file', 'directory'],
+        path: Path | None = None,
+        *args,
+        **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
+        self._path = path
         self.path_type = path_type
 
     def compose(self) -> ComposeResult:
-        with Horizontal():
-            yield Input(placeholder='--empty--', disabled=True)
-            yield Button(f'  Choose {self.path_type}  ')
+        button_label = ''
+        if self.path_type == 'file':
+            button_label = ' 📄 '
+        elif self.path_type == 'directory':
+            button_label = ' 🗂 '
+
+        yield Input(placeholder='--empty--', disabled=True)
+        yield Button(button_label, tooltip=f'Choose {self.path_type}')
 
     def on_mount(self) -> None:
         self.input = self.query_one(Input)
         self.button = self.query_one(Button)
+
+        self.path = self._path
 
     @on(Button.Pressed)
     def open_path_chooser(self) -> None:
@@ -250,4 +274,4 @@ class PathChooser(Widget):
     def watch_path(self, value: Path | None) -> None:
         self.input.value = str(value) if value else ''
         self.input.tooltip = str(value) if value else ''
-        self.post_message(message=self.Changed(path=value))
+        self.post_message(message=self.Changed(path_chooser=self, path=value))
