@@ -10,6 +10,7 @@ jobs:
   verify-version:
     name: Verify version
     runs-on: ubuntu-latest
+    if: startsWith(github.ref_name, 'release')
 
     steps:
       - name: Check out repository
