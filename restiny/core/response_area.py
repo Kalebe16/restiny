@@ -18,7 +18,7 @@ from restiny.widgets import CustomTextArea
 # TODO: Implement 'Trace' tab pane
 class ResponseArea(Static):
     ALLOW_MAXIMIZE = True
-    focusable = True
+    can_focus = True
     BORDER_TITLE = 'Response'
     DEFAULT_CSS = """
     ResponseArea {
