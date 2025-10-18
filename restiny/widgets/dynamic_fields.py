@@ -6,20 +6,20 @@ from textual import on
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.message import Message
+from textual.widget import Widget
 from textual.widgets import (
     Button,
     ContentSwitcher,
     Input,
     RadioButton,
     RadioSet,
-    Static,
     Switch,
 )
 
 from restiny.widgets.path_chooser import PathChooser
 
 
-class DynamicField(Static):
+class DynamicField(Widget):
     @abstractmethod
     def compose(self) -> ComposeResult: ...
 
@@ -130,6 +130,8 @@ class TextDynamicField(DynamicField):
 
     DEFAULT_CSS = """
     TextDynamicField {
+        width: 100%;
+        height: auto;
         layout: grid;
         grid-size: 4 1;
         grid-columns: auto 1fr 2fr auto; /* Set 1:2 ratio between Inputs */
@@ -140,23 +142,35 @@ class TextDynamicField(DynamicField):
         self, enabled: bool, key: str, value: str, *args, **kwargs
     ) -> None:
         super().__init__(*args, **kwargs)
-
-        # Store initial values temporarily; applied after mounting.
-        self._enabled = enabled
-        self._key = key
-        self._value = value
+        self._initial_enabled = enabled
+        self._initial_key = key
+        self._initial_value = value
 
     def compose(self) -> ComposeResult:
-        yield Switch(value=self._enabled, tooltip='Send this field?')
-        yield Input(value=self._key, placeholder='Key', id='key')
-        yield Input(value=self._value, placeholder='Value', id='value')
-        yield Button(label='➖', tooltip='Remove field')
+        yield Switch(
+            value=self._initial_enabled,
+            tooltip='Send this field?',
+            id='enabled',
+        )
+        yield Input(
+            value=self._initial_key,
+            placeholder='Key',
+            select_on_focus=False,
+            id='key',
+        )
+        yield Input(
+            value=self._initial_value,
+            placeholder='Value',
+            select_on_focus=False,
+            id='value',
+        )
+        yield Button(label='➖', tooltip='Remove field', id='remove')
 
-    def on_mount(self) -> None:
-        self.enabled_switch: Switch = self.query_one(Switch)
-        self.key_input: Input = self.query_one('#key', Input)
-        self.value_input: Input = self.query_one('#value', Input)
-        self.remove_button: Button = self.query_one(Button)
+    async def on_mount(self) -> None:
+        self.enabled_switch = self.query_one('#enabled', Switch)
+        self.key_input = self.query_one('#key', Input)
+        self.value_input = self.query_one('#value', Input)
+        self.remove_button = self.query_one('#remove', Button)
 
     @property
     def enabled(self) -> bool:
@@ -190,14 +204,15 @@ class TextDynamicField(DynamicField):
     def is_empty(self) -> bool:
         return not self.is_filled
 
-    @on(Switch.Changed)
+    @on(Switch.Changed, '#enabled')
     def on_enabled_or_disabled(self, message: Switch.Changed) -> None:
         if message.value is True:
             self.post_message(self.Enabled(field=self))
         elif message.value is False:
             self.post_message(message=self.Disabled(field=self))
 
-    @on(Input.Changed)
+    @on(Input.Changed, '#key')
+    @on(Input.Changed, '#value')
     def on_input_changed(self, message: Input.Changed) -> None:
         self.enabled_switch.value = True
 
@@ -206,12 +221,12 @@ class TextDynamicField(DynamicField):
         elif self.is_filled:
             self.post_message(message=self.Filled(field=self))
 
-    @on(Button.Pressed)
+    @on(Button.Pressed, '#remove')
     def on_remove_requested(self, message: Button.Pressed) -> None:
         self.post_message(self.RemoveRequested(field=self))
 
 
-class _ValueMode(StrEnum):
+class _ValueKind(StrEnum):
     TEXT = 'text'
     FILE = 'file'
 
@@ -240,66 +255,72 @@ class TextOrFileDynamicField(DynamicField):
         enabled: bool = False,
         key: str = '',
         value: str | Path | None = '',
-        value_mode: _ValueMode = 'text',
+        value_kind: _ValueKind = _ValueKind.TEXT,
         *args,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self._enabled = enabled
-        self._key = key
-        self._value = value
-        self._value_mode = value_mode
+        self._initial_enabled = enabled
+        self._initial_key = key
+        self._initial_value = value
+        self._initial_value_kind = value_kind
 
     def compose(self) -> ComposeResult:
-        with RadioSet(id='value-mode', compact=True):
+        with RadioSet(id='value-kind', compact=True):
             yield RadioButton(
-                label=_ValueMode.TEXT,
-                value=bool(self._value_mode == _ValueMode.TEXT),
-                id='value-mode-text',
+                label=_ValueKind.TEXT,
+                value=bool(self._initial_value_kind == _ValueKind.TEXT),
+                id='value-kind-text',
             )
             yield RadioButton(
-                label=_ValueMode.FILE,
-                value=bool(self._value_mode == _ValueMode.FILE),
-                id='value-mode-file',
+                label=_ValueKind.FILE,
+                value=bool(self._initial_value_kind == _ValueKind.FILE),
+                id='value-kind-file',
             )
         yield Switch(
-            value=self._enabled,
+            value=self._initial_enabled,
             tooltip='Send this field?',
             id='enabled',
         )
-        yield Input(value=self._key, placeholder='Key', id='key')
+        yield Input(
+            value=self._initial_key,
+            placeholder='Key',
+            select_on_focus=False,
+            id='key',
+        )
         with ContentSwitcher(
             initial='value-text'
-            if self._value_mode == _ValueMode.TEXT
+            if self._initial_value_kind == _ValueKind.TEXT
             else 'value-file',
-            id='value-mode-switcher',
+            id='value-kind-switcher',
         ):
             yield Input(
-                value=self._value
-                if self._value_mode == _ValueMode.TEXT
+                value=self._initial_value
+                if self._initial_value_kind == _ValueKind.TEXT
                 else '',
                 placeholder='Value',
+                select_on_focus=False,
                 id='value-text',
             )
             yield PathChooser.file(
-                path=self._value
-                if self._value_mode == _ValueMode.FILE
+                path=self._initial_value
+                if self._initial_value_kind == _ValueKind.FILE
                 else None,
                 id='value-file',
             )
         yield Button(label='➖', tooltip='Remove field', id='remove')
 
     def on_mount(self) -> None:
-        self.value_mode_switcher = self.query_one(
-            '#value-mode-switcher', ContentSwitcher
+        self.value_kind_switcher = self.query_one(
+            '#value-kind-switcher', ContentSwitcher
         )
 
-        self.value_mode_radioset = self.query_one('#value-mode', RadioSet)
-        self.value_mode_text_radio_button = self.query_one(
-            '#value-mode-text', RadioButton
+        self.value_kind_radioset = self.query_one('#value-kind', RadioSet)
+        self.value_kind_text_radio_button = self.query_one(
+            '#value-kind-text', RadioButton
         )
-        self.value_mode_file_radio_button = self.query_one(
-            '#value-mode-file', RadioButton
+        self.value_kind_file_radio_button = self.query_one(
+            '#value-kind-file', RadioButton
         )
         self.enabled_switch = self.query_one('#enabled', Switch)
         self.key_input = self.query_one('#key', Input)
@@ -325,42 +346,42 @@ class TextOrFileDynamicField(DynamicField):
 
     @property
     def value(self) -> str | Path | None:
-        if self.value_mode == _ValueMode.TEXT:
+        if self.value_kind == _ValueKind.TEXT:
             return self.value_text_input.value
-        elif self.value_mode == _ValueMode.FILE:
+        elif self.value_kind == _ValueKind.FILE:
             return self.value_file_input.path
 
     @value.setter
-    def value(self, value: str | Path) -> None:
+    def value(self, value: str | Path | None) -> None:
         if isinstance(value, str):
             self.value_text_input.value = value
-        elif isinstance(value, Path):
+        elif isinstance(value, Path) or value is None:
             self.value_file_input.path = value
 
     @property
-    def value_mode(self) -> _ValueMode:
-        return _ValueMode(self.value_mode_radioset.pressed_button.label)
+    def value_kind(self) -> _ValueKind:
+        return _ValueKind(self.value_kind_radioset.pressed_button.label)
 
-    @value_mode.setter
-    def value_mode(self, value: _ValueMode) -> None:
-        if value == _ValueMode.TEXT:
-            self.value_mode_switcher.current = 'value-text'
-            self.value_mode_text_radio_button.value = True
-        elif value == _ValueMode.FILE:
-            self.value_mode_switcher.current = 'value-file'
-            self.value_mode_file_radio_button.value = True
+    @value_kind.setter
+    def value_kind(self, value: _ValueKind) -> None:
+        if value == _ValueKind.TEXT:
+            self.value_kind_switcher.current = 'value-text'
+            self.value_kind_text_radio_button.value = True
+        elif value == _ValueKind.FILE:
+            self.value_kind_switcher.current = 'value-file'
+            self.value_kind_file_radio_button.value = True
 
     @property
     def is_filled(self) -> bool:
         if len(self.key_input.value) > 0:
             return True
         elif (
-            self.value_mode == _ValueMode.TEXT
+            self.value_kind == _ValueKind.TEXT
             and len(self.value_text_input.value) > 0
         ):
             return True
         elif (
-            self.value_mode == _ValueMode.FILE
+            self.value_kind == _ValueKind.FILE
             and self.value_file_input.path is not None
         ):
             return True
@@ -371,9 +392,9 @@ class TextOrFileDynamicField(DynamicField):
     def is_empty(self) -> bool:
         return not self.is_filled
 
-    @on(RadioSet.Changed, '#value-mode')
-    def on_value_mode_changed(self, message: RadioSet.Changed) -> None:
-        self.value_mode = _ValueMode(message.pressed.label)
+    @on(RadioSet.Changed, '#value-kind')
+    def on_value_kind_changed(self, message: RadioSet.Changed) -> None:
+        self.value_kind = _ValueKind(message.pressed.label)
 
     @on(Switch.Changed, '#enabled')
     def on_enabled_or_disabled(self, message: Switch.Changed) -> None:
@@ -400,9 +421,16 @@ class TextOrFileDynamicField(DynamicField):
         self.post_message(self.RemoveRequested(field=self))
 
 
-class DynamicFields(Static):
+class DynamicFields(Widget):
     """
     Enableable and removable fields
+    """
+
+    DEFAULT_CSS = """
+    DynamicFields {
+        width: auto;
+        height: 1fr;
+    }
     """
 
     class FieldEmpty(Message):
@@ -447,14 +475,11 @@ class DynamicFields(Static):
         self._fields = fields
 
     def compose(self) -> ComposeResult:
-        yield VerticalScroll()
+        with VerticalScroll(can_focus=False):
+            yield from self._fields
 
-    async def on_mount(self) -> None:
+    def on_mount(self) -> None:
         self.fields_container = self.query_one(VerticalScroll)
-
-        # Set initial_fields
-        for field in self._fields:
-            await self.add_field(field=field)
 
     @property
     def fields(self) -> list[DynamicField]:
@@ -469,7 +494,7 @@ class DynamicFields(Static):
         return [field for field in self.fields if field.is_filled]
 
     @property
-    def values(self) -> list[dict[str, str | bool]]:
+    def values(self) -> list[dict[str, str | bool | Path | None]]:
         return [
             {
                 'enabled': field.enabled,
@@ -479,62 +504,63 @@ class DynamicFields(Static):
             for field in self.fields
         ]
 
+    async def add_field(self, field: DynamicField) -> None:
+        await self.fields_container.mount(field)
+
+    def remove_field(self, field: DynamicField) -> None:
+        field.add_class('hidden')
+        field.remove()
+
     @on(DynamicField.Empty)
-    async def on_field_is_empty(self, message: DynamicField.Empty) -> None:
-        await self.remove_field(field=message.control)
+    def _on_field_is_empty(self, message: DynamicField.Empty) -> None:
+        self._focus_neighbor_field_then_remove(field=message.field)
         self.post_message(
-            message=self.FieldEmpty(fields=self, field=message.control)
+            message=self.FieldEmpty(fields=self, field=message.field)
         )
 
     @on(DynamicField.Filled)
-    async def on_field_is_filled(self, message: DynamicField.Filled) -> None:
+    async def _on_field_is_filled(self, message: DynamicField.Filled) -> None:
         if len(self.empty_fields) == 0:
-            last_field = self.fields[-1]
-            if isinstance(last_field, TextDynamicField):
+            field = message.field
+            if isinstance(field, TextDynamicField):
                 await self.add_field(
                     TextDynamicField(enabled=False, key='', value='')
                 )
-            elif isinstance(last_field, TextOrFileDynamicField):
+            elif isinstance(field, TextOrFileDynamicField):
                 await self.add_field(
                     TextOrFileDynamicField(
                         enabled=False,
                         key='',
                         value='',
-                        value_mode=_ValueMode.TEXT,
+                        value_kind=_ValueKind.TEXT,
                     )
                 )
 
         self.post_message(
-            message=self.FieldFilled(fields=self, field=message.control)
+            message=self.FieldFilled(fields=self, field=message.field)
         )
 
     @on(DynamicField.RemoveRequested)
-    async def on_field_remove_requested(
+    def _on_field_remove_requested(
         self, message: DynamicField.RemoveRequested
     ) -> None:
-        await self.remove_field(field=message.control)
+        self._focus_neighbor_field_then_remove(field=message.field)
 
-    async def add_field(self, field: DynamicField) -> None:
-        await self.fields_container.mount(field)
-
-    async def remove_field(self, field: DynamicField) -> None:
+    def _focus_neighbor_field_then_remove(self, field: DynamicField) -> None:
         if len(self.fields) == 1:
             self.app.bell()
             return
-        elif self.fields[-1] is field:  # Last field
+        elif field is self.fields[-1]:
             self.app.bell()
             return
 
-        if self.fields[0] is field:  # First field
-            self.app.screen.focus_next()
-            self.app.screen.focus_next()
-            self.app.screen.focus_next()
-            self.app.screen.focus_next()
-        elif self.fields[-2] is field:  # Penultimate field
-            self.app.screen.focus_previous()
-            self.app.screen.focus_previous()
-            self.app.screen.focus_previous()
-            self.app.screen.focus_previous()
+        field_index = self.fields.index(field)
 
-        field.add_class('hidden')
-        await field.remove()  # Maybe the `await` is unnecessary
+        neighbor_field = None
+        if field_index == 0:
+            neighbor_field = self.fields[field_index + 1]
+        else:
+            neighbor_field = self.fields[field_index - 1]
+
+        self.app.set_focus(neighbor_field.query_one(Input))
+        self.remove_field(field=field)

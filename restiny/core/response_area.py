@@ -1,6 +1,9 @@
+from dataclasses import dataclass
+from http import HTTPStatus
+
 from textual import on
 from textual.app import ComposeResult
-from textual.reactive import Reactive
+from textual.containers import VerticalScroll
 from textual.widgets import (
     ContentSwitcher,
     DataTable,
@@ -13,6 +16,16 @@ from textual.widgets import (
 
 from restiny.enums import BodyRawLanguage
 from restiny.widgets import CustomTextArea
+
+
+@dataclass
+class ResponseAreaData:
+    status: HTTPStatus
+    size: int
+    elapsed_time: float | int
+    headers: dict
+    body_raw_language: BodyRawLanguage
+    body_raw: str
 
 
 # TODO: Implement 'Trace' tab pane
@@ -38,8 +51,6 @@ class ResponseArea(Static):
 
     """
 
-    has_response: bool = Reactive(False, layout=True, init=True)
-
     def compose(self) -> ComposeResult:
         with ContentSwitcher(id='response-switcher', initial='no-content'):
             yield Label(
@@ -49,7 +60,8 @@ class ResponseArea(Static):
 
             with TabbedContent(id='content'):
                 with TabPane('Headers'):
-                    yield DataTable(show_cursor=False, id='headers')
+                    with VerticalScroll():
+                        yield DataTable(show_cursor=False, id='headers')
                 with TabPane('Body'):
                     yield Select(
                         (
@@ -60,11 +72,11 @@ class ResponseArea(Static):
                             ('XML', BodyRawLanguage.XML),
                         ),
                         allow_blank=False,
-                        tooltip='Body type',
-                        id='body-type',
+                        tooltip='Syntax highlighting for the response body',
+                        id='body-raw-language',
                     )
                     yield CustomTextArea.code_editor(
-                        id='body', read_only=True, classes='mt-1'
+                        id='body-raw', read_only=True, classes='mt-1'
                     )
 
     def on_mount(self) -> None:
@@ -73,25 +85,46 @@ class ResponseArea(Static):
         )
 
         self.headers_data_table = self.query_one('#headers', DataTable)
-        self.body_type_select = self.query_one('#body-type', Select)
-        self.body_text_area = self.query_one('#body', CustomTextArea)
+        self.body_raw_language_select = self.query_one(
+            '#body-raw-language', Select
+        )
+        self.body_raw_editor = self.query_one('#body-raw', CustomTextArea)
 
         self.headers_data_table.add_columns('Key', 'Value')
 
-    @on(Select.Changed, '#body-type')
-    def on_body_type_changed(self, message: Select.Changed) -> None:
-        self.body_text_area.language = self.body_type_select.value
+    def set_data(self, data: ResponseAreaData | None) -> None:
+        self.border_title = self.BORDER_TITLE
+        self.border_subtitle = ''
+        self.headers_data_table.clear()
+        self.body_raw_language_select.value = BodyRawLanguage.PLAIN
+        self.body_raw_editor.clear()
 
-    def watch_has_response(self, value: bool) -> None:
+        if data is None:
+            return
+
+        self.border_title = f'Response - {data.status} {data.status.phrase}'
+        self.border_subtitle = (
+            f'{data.size} bytes in {data.elapsed_time} seconds'
+        )
+        for header_key, header_value in data.headers.items():
+            self.headers_data_table.add_row(header_key, header_value)
+        self.body_raw_language_select.value = data.body_raw_language
+        self.body_raw_editor.text = data.body_raw
+
+    @property
+    def is_showing_response(self) -> bool:
+        if self._response_switcher.current == 'content':
+            return True
+        elif self._response_switcher.current == 'no-content':
+            return False
+
+    @is_showing_response.setter
+    def is_showing_response(self, value: bool) -> None:
         if value is True:
             self._response_switcher.current = 'content'
         elif value is False:
             self._response_switcher.current = 'no-content'
-            self.reset_response()
 
-    def reset_response(self) -> None:
-        self.border_title = self.BORDER_TITLE
-        self.border_subtitle = ''
-        self.headers_data_table.clear()
-        self.body_type_select.value = BodyRawLanguage.PLAIN
-        self.body_text_area.clear()
+    @on(Select.Changed, '#body-raw-language')
+    def _on_body_raw_language_changed(self, message: Select.Changed) -> None:
+        self.body_raw_editor.language = self.body_raw_language_select.value

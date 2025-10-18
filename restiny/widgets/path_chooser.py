@@ -1,5 +1,5 @@
+from enum import StrEnum
 from pathlib import Path
-from typing import Literal
 
 from textual import on
 from textual.app import ComposeResult
@@ -55,6 +55,7 @@ class PathChooserScreen(ModalScreen):
             with Horizontal(classes='w-auto h-auto mt-1'):
                 yield Input(
                     placeholder='--empty--',
+                    select_on_focus=False,
                     disabled=True,
                     type='text',
                     classes='w-1fr',
@@ -181,6 +182,11 @@ class DirectoryChooserScreen(PathChooserScreen):
         return True
 
 
+class _PathType(StrEnum):
+    FILE = 'file'
+    DIR = 'directory'
+
+
 class PathChooser(Widget):
     DEFAULT_CSS = """
     PathChooser {
@@ -202,8 +208,6 @@ class PathChooser(Widget):
     }
     """
 
-    path: Reactive[Path | None] = Reactive(None)
-
     class Changed(Message):
         """
         Sent when the user change the selected path.
@@ -222,56 +226,73 @@ class PathChooser(Widget):
 
     @classmethod
     def file(cls, *args, **kwargs) -> 'PathChooser':
-        return cls(*args, **kwargs, path_type='file')
+        return cls(*args, **kwargs, path_type=_PathType.FILE)
 
     @classmethod
     def directory(cls, *args, **kwargs) -> 'PathChooser':
-        return cls(*args, **kwargs, path_type='directory')
+        return cls(*args, **kwargs, path_type=_PathType.DIR)
 
     def __init__(
         self,
-        path_type: Literal['file', 'directory'],
+        path_type: _PathType,
         path: Path | None = None,
         *args,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self._path = path
         self.path_type = path_type
+        self._initial_path = path
 
     def compose(self) -> ComposeResult:
-        button_label = ''
-        if self.path_type == 'file':
-            button_label = ' 📄 '
-        elif self.path_type == 'directory':
-            button_label = ' 🗂 '
+        icon = ''
+        if self.path_type == _PathType.FILE:
+            icon = ' 📄 '
+        elif self.path_type == _PathType.DIR:
+            icon = ' 🗂 '
 
-        yield Input(placeholder='--empty--', disabled=True)
-        yield Button(button_label, tooltip=f'Choose {self.path_type}')
+        yield Input(
+            self._initial_path,
+            placeholder='--empty--',
+            select_on_focus=False,
+            disabled=True,
+            id='path',
+        )
+        yield Button(icon, tooltip=f'Choose {self.path_type}', id='choose')
 
     def on_mount(self) -> None:
-        self.input = self.query_one(Input)
-        self.button = self.query_one(Button)
+        self.path_input = self.query_one('#path', Input)
+        self.choose_button = self.query_one('#choose', Button)
 
-        self.path = self._path
+    @property
+    def path(self) -> Path | None:
+        if self.path_input.value != '':
+            return Path(self.path_input.value)
+        return None
 
-    @on(Button.Pressed)
-    def open_path_chooser(self) -> None:
+    @path.setter
+    def path(self, value: Path | None) -> None:
+        value = str(value) if value else ''
+        self.path_input.value = value
+        self.path_input.tooltip = value
+
+    @on(Input.Changed, '#path')
+    def _on_path_changed(self, message: Input.Changed) -> None:
+        self.post_message(
+            message=self.Changed(path_chooser=self, path=self.path)
+        )
+
+    @on(Button.Pressed, '#choose')
+    def _on_path_choose(self) -> None:
         def set_path(path: Path | None = None) -> None:
             self.path = path
 
-        if self.path_type == 'file':
+        if self.path_type == _PathType.FILE:
             self.app.push_screen(
                 screen=FileChooserScreen(),
                 callback=set_path,
             )
-        elif self.path_type == 'directory':
+        elif self.path_type == _PathType.DIR:
             self.app.push_screen(
                 screen=DirectoryChooserScreen(),
                 callback=set_path,
             )
-
-    def watch_path(self, value: Path | None) -> None:
-        self.input.value = str(value) if value else ''
-        self.input.tooltip = str(value) if value else ''
-        self.post_message(message=self.Changed(path_chooser=self, path=value))

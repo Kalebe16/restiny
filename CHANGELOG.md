@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [0.2.0] - 2025-10-11
+## unreleased
+
+### Fixed
+
+- Fixed unwanted auto-select behavior when refocusing inputs.
+- Fixed focus navigation logic in DynamicFields when removing fields.
+
+## [0.2.0] - 2025-10-15
 
 ### Added
 
