@@ -51,7 +51,7 @@ class URLArea(Static):
         yield Select.from_values(
             values=HTTPMethod.values(), allow_blank=False, id='method'
         )
-        yield Input(placeholder='Enter URL', id='url')
+        yield Input(placeholder='Enter URL', select_on_focus=False, id='url')
         with ContentSwitcher(
             id='request-button-switcher', initial='send-request'
         ):

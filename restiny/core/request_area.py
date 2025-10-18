@@ -174,6 +174,7 @@ class RequestArea(Static):
                     yield Input(
                         '5.5',
                         placeholder='5.5',
+                        select_on_focus=False,
                         id='options-timeout',
                         classes='w-1fr',
                     )

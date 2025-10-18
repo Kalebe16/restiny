@@ -152,8 +152,18 @@ class TextDynamicField(DynamicField):
             tooltip='Send this field?',
             id='enabled',
         )
-        yield Input(value=self._initial_key, placeholder='Key', id='key')
-        yield Input(value=self._initial_value, placeholder='Value', id='value')
+        yield Input(
+            value=self._initial_key,
+            placeholder='Key',
+            select_on_focus=False,
+            id='key',
+        )
+        yield Input(
+            value=self._initial_value,
+            placeholder='Value',
+            select_on_focus=False,
+            id='value',
+        )
         yield Button(label='➖', tooltip='Remove field', id='remove')
 
     async def on_mount(self) -> None:
@@ -272,7 +282,12 @@ class TextOrFileDynamicField(DynamicField):
             tooltip='Send this field?',
             id='enabled',
         )
-        yield Input(value=self._initial_key, placeholder='Key', id='key')
+        yield Input(
+            value=self._initial_key,
+            placeholder='Key',
+            select_on_focus=False,
+            id='key',
+        )
         with ContentSwitcher(
             initial='value-text'
             if self._initial_value_kind == _ValueKind.TEXT
@@ -284,6 +299,7 @@ class TextOrFileDynamicField(DynamicField):
                 if self._initial_value_kind == _ValueKind.TEXT
                 else '',
                 placeholder='Value',
+                select_on_focus=False,
                 id='value-text',
             )
             yield PathChooser.file(
