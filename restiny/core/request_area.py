@@ -82,7 +82,7 @@ class RequestAreaData:
 
 class RequestArea(Static):
     ALLOW_MAXIMIZE = True
-    focusable = True
+    can_focus = True
     BORDER_TITLE = 'Request'
     DEFAULT_CSS = """
     RequestArea {

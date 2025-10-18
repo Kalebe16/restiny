@@ -17,7 +17,7 @@ class URLAreaData:
 
 class URLArea(Static):
     ALLOW_MAXIMIZE = True
-    focusable = True
+    can_focus = True
     BORDER_TITLE = 'URL'
     DEFAULT_CSS = """
     URLArea {

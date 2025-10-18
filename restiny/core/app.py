@@ -70,7 +70,7 @@ class RESTinyApp(App, inherit_bindings=False):
     @on(DescendantFocus)
     def on_focus(self, event: DescendantFocus) -> None:
         self.last_focused_widget = event.widget
-        last_focused_maximizable_area = self.find_maximizable_area_by_widget(
+        last_focused_maximizable_area = self._find_maximizable_area_by_widget(
             widget=event.widget
         )
         if last_focused_maximizable_area:
@@ -151,14 +151,15 @@ class RESTinyApp(App, inherit_bindings=False):
             severity='information',
         )
 
-    def find_maximizable_area_by_widget(self, widget: Widget) -> Widget | None:
-        maximizable_areas: list[str] = [
-            URLArea.__name__,
-            RequestArea.__name__,
-            ResponseArea.__name__,
-        ]
+    def _find_maximizable_area_by_widget(
+        self, widget: Widget
+    ) -> Widget | None:
         while widget is not None:
-            if widget.__class__.__name__ in maximizable_areas:
+            if (
+                isinstance(widget, URLArea)
+                or isinstance(widget, RequestArea)
+                or isinstance(widget, ResponseArea)
+            ):
                 return widget
             widget = widget.parent
 
