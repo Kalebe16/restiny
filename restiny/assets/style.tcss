@@ -3,6 +3,10 @@ Button {
     max-width: 100%;
 }
 
+Input {
+    width: 1fr;
+}
+
 .hidden {
     display: none;
 }
@@ -19,6 +23,10 @@ Button {
     width: 2fr;
 }
 
+.w-3fr {
+    width: 3fr;
+}
+
 .h-auto {
     height: auto;
 }
@@ -28,7 +36,11 @@ Button {
 }
 
 .h-2fr {
-    width: 2fr;
+    height: 2fr;
+}
+
+.h-3fr {
+    height: 3fr;
 }
 
 .p-0 {
