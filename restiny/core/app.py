@@ -1,6 +1,7 @@
 import asyncio
 import json
 import mimetypes
+from http import HTTPStatus
 from pathlib import Path
 
 import httpx
@@ -15,7 +16,14 @@ from textual.widgets import Footer, Header
 
 from restiny.__about__ import __version__
 from restiny.assets import STYLE_TCSS
-from restiny.core import RequestArea, ResponseArea, URLArea
+from restiny.core import (
+    RequestArea,
+    RequestAreaData,
+    ResponseArea,
+    URLArea,
+    URLAreaData,
+)
+from restiny.core.response_area import ResponseAreaData
 from restiny.enums import BodyMode, BodyRawLanguage, ContentType
 from restiny.utils import build_curl_cmd
 
@@ -66,25 +74,6 @@ class RESTinyApp(App, inherit_bindings=False):
         self.url_area = self.query_one(URLArea)
         self.request_area = self.query_one(RequestArea)
         self.response_area = self.query_one(ResponseArea)
-
-    @on(DescendantFocus)
-    def on_focus(self, event: DescendantFocus) -> None:
-        self.last_focused_widget = event.widget
-        last_focused_maximizable_area = self._find_maximizable_area_by_widget(
-            widget=event.widget
-        )
-        if last_focused_maximizable_area:
-            self.last_focused_maximizable_area = last_focused_maximizable_area
-
-    @on(URLArea.SendRequest)
-    def on_send_request(self, message: URLArea.SendRequest) -> None:
-        self.response_area.reset_response()
-        self.current_request = asyncio.create_task(self.send_request())
-
-    @on(URLArea.CancelRequest)
-    def on_cancel_request(self, message: URLArea.CancelRequest) -> None:
-        if self.current_request and not self.current_request.done():
-            self.current_request.cancel()
 
     def action_maximize_or_minimize_area(self) -> None:
         if self.screen.maximized:
@@ -144,12 +133,37 @@ class RESTinyApp(App, inherit_bindings=False):
             form_multipart=form_multipart,
             files=files,
         )
-        self.app.copy_to_clipboard(curl_cmd)
-        pyperclip.copy(curl_cmd)
+        self.copy_to_clipboard(curl_cmd)
         self.notify(
-            f'Command cURL copied to clipboard: `{curl_cmd}`',
+            'Command CURL copied to clipboard',
             severity='information',
         )
+
+    def copy_to_clipboard(self, text: str) -> None:
+        super().copy_to_clipboard(text)
+        try:
+            # Also copy to the system clipboard (outside of the app)
+            pyperclip.copy(text)
+        except Exception:
+            pass
+
+    @on(DescendantFocus)
+    def _on_focus(self, event: DescendantFocus) -> None:
+        self.last_focused_widget = event.widget
+        last_focused_maximizable_area = self._find_maximizable_area_by_widget(
+            widget=event.widget
+        )
+        if last_focused_maximizable_area:
+            self.last_focused_maximizable_area = last_focused_maximizable_area
+
+    @on(URLArea.SendRequest)
+    def _on_send_request(self, message: URLArea.SendRequest) -> None:
+        self.current_request = asyncio.create_task(self._send_request())
+
+    @on(URLArea.CancelRequest)
+    def _on_cancel_request(self, message: URLArea.CancelRequest) -> None:
+        if self.current_request and not self.current_request.done():
+            self.current_request.cancel()
 
     def _find_maximizable_area_by_widget(
         self, widget: Widget
@@ -163,10 +177,49 @@ class RESTinyApp(App, inherit_bindings=False):
                 return widget
             widget = widget.parent
 
-    async def send_request(self) -> None:
+    async def _send_request(self) -> None:
         url_area_data = self.url_area.get_data()
         request_area_data = self.request_area.get_data()
 
+        self.response_area.set_data(data=None)
+        self.response_area.loading = True
+        self.url_area.request_pending = True
+        try:
+            async with httpx.AsyncClient(
+                timeout=request_area_data.options.timeout,
+                follow_redirects=request_area_data.options.follow_redirects,
+                verify=request_area_data.options.verify_ssl,
+            ) as http_client:
+                request = self._build_request(
+                    http_client=http_client,
+                    url_area_data=url_area_data,
+                    request_area_data=request_area_data,
+                )
+                response = await http_client.send(request=request)
+                self._display_response(response=response)
+                self.response_area.is_showing_response = True
+        except httpx.RequestError as error:
+            error_name = type(error).__name__
+            error_message = str(error)
+            if error_message:
+                self.notify(f'{error_name}: {error_message}', severity='error')
+            else:
+                self.notify(f'{error_name}', severity='error')
+            self.response_area.set_data(data=None)
+            self.response_area.is_showing_response = False
+        except asyncio.CancelledError:
+            self.response_area.set_data(data=None)
+            self.response_area.is_showing_response = False
+        finally:
+            self.response_area.loading = False
+            self.url_area.request_pending = False
+
+    def _build_request(
+        self,
+        http_client: httpx.Client,
+        url_area_data: URLAreaData,
+        request_area_data: RequestAreaData,
+    ) -> httpx.Request:
         headers: dict[str, str] = {
             header.key: header.value
             for header in request_area_data.headers
@@ -178,166 +231,118 @@ class RESTinyApp(App, inherit_bindings=False):
             if param.enabled
         }
 
-        self.response_area.loading = True
-        self.url_area.request_pending = True
-        try:
-            async with httpx.AsyncClient(
-                timeout=request_area_data.options.timeout,
-                follow_redirects=request_area_data.options.follow_redirects,
-                verify=request_area_data.options.verify_ssl,
-            ) as http_client:
-                request = None
-
-                if not request_area_data.body.enabled:
-                    request = http_client.build_request(
-                        method=url_area_data.method,
-                        url=url_area_data.url,
-                        headers=headers,
-                        params=query_params,
-                    )
-                else:
-                    if request_area_data.body.type == BodyMode.RAW:
-                        raw = request_area_data.body.payload
-
-                        if (
-                            request_area_data.body.raw_language
-                            == BodyRawLanguage.JSON
-                        ):
-                            headers['content-type'] = ContentType.JSON
-                            try:
-                                raw = json.dumps(raw)
-                            except Exception:
-                                pass
-                        elif (
-                            request_area_data.body.raw_language
-                            == BodyRawLanguage.YAML
-                        ):
-                            headers['content-type'] = ContentType.YAML
-                        elif (
-                            request_area_data.body.raw_language
-                            == BodyRawLanguage.HTML
-                        ):
-                            headers['content-type'] = ContentType.HTML
-                        elif (
-                            request_area_data.body.raw_language
-                            == BodyRawLanguage.XML
-                        ):
-                            headers['content-type'] = ContentType.XML
-                        elif (
-                            request_area_data.body.raw_language
-                            == BodyRawLanguage.PLAIN
-                        ):
-                            headers['content-type'] = ContentType.TEXT
-
-                        request = http_client.build_request(
-                            method=url_area_data.method,
-                            url=url_area_data.url,
-                            headers=headers,
-                            params=query_params,
-                            content=raw,
-                        )
-                    elif request_area_data.body.type == BodyMode.FILE:
-                        file = request_area_data.body.payload
-                        if 'content-type' not in headers:
-                            headers['content-type'] = (
-                                mimetypes.guess_type(file.name)[0]
-                                or 'application/octet-stream'
-                            )
-                        request = http_client.build_request(
-                            method=url_area_data.method,
-                            url=url_area_data.url,
-                            headers=headers,
-                            params=query_params,
-                            content=file.read_bytes(),
-                        )
-                    elif (
-                        request_area_data.body.type == BodyMode.FORM_URLENCODED
-                    ):
-                        form_urlencoded = {
-                            form_item.key: form_item.value
-                            for form_item in request_area_data.body.payload
-                            if form_item.enabled
-                        }
-                        request = http_client.build_request(
-                            method=url_area_data.method,
-                            url=url_area_data.url,
-                            headers=headers,
-                            params=query_params,
-                            data=form_urlencoded,
-                        )
-                    elif (
-                        request_area_data.body.type == BodyMode.FORM_MULTIPART
-                    ):
-                        form_multipart_str = {
-                            form_item.key: form_item.value
-                            for form_item in request_area_data.body.payload
-                            if form_item.enabled
-                            and isinstance(form_item.value, str)
-                        }
-                        form_multipart_files = {
-                            form_item.key: (
-                                form_item.value.name,
-                                form_item.value.read_bytes(),
-                                mimetypes.guess_type(form_item.value.name)[0]
-                                or 'application/octet-stream',
-                            )
-                            for form_item in request_area_data.body.payload
-                            if form_item.enabled
-                            and isinstance(form_item.value, Path)
-                        }
-                        request = http_client.build_request(
-                            method=url_area_data.method,
-                            url=url_area_data.url,
-                            headers=headers,
-                            params=query_params,
-                            data=form_multipart_str,
-                            files=form_multipart_files,
-                        )
-
-                response = await http_client.send(request=request)
-        except httpx.RequestError as error:
-            error_name = type(error).__name__
-            error_message = str(error)
-            if error_message:
-                self.notify(f'{error_name}: {error_message}', severity='error')
-            else:
-                self.notify(f'{error_name}', severity='error')
-            self.response_area.has_response = False
-        except asyncio.CancelledError:
-            self.response_area.has_response = False
-        else:
-            self.display_response(response=response)
-            self.response_area.has_response = True
-        finally:
-            self.response_area.loading = False
-            self.url_area.request_pending = False
-
-    def display_response(self, response: httpx.Response) -> None:
-        def display_status() -> None:
-            self.response_area.border_title = (
-                f'Response - {response.status_code} {response.reason_phrase}'
+        if not request_area_data.body.enabled:
+            return http_client.build_request(
+                method=url_area_data.method,
+                url=url_area_data.url,
+                headers=headers,
+                params=query_params,
             )
 
-        def display_size_and_elapsed_time() -> None:
-            self.response_area.border_subtitle = f'{response.num_bytes_downloaded} bytes in {response.elapsed.total_seconds():.2f} seconds'
+        if request_area_data.body.type == BodyMode.RAW:
+            raw_language_to_content_type = {
+                BodyRawLanguage.JSON: ContentType.JSON,
+                BodyRawLanguage.YAML: ContentType.YAML,
+                BodyRawLanguage.HTML: ContentType.HTML,
+                BodyRawLanguage.XML: ContentType.XML,
+                BodyRawLanguage.PLAIN: ContentType.TEXT,
+            }
+            headers['content-type'] = raw_language_to_content_type.get(
+                request_area_data.body.raw_language, ContentType.TEXT
+            )
 
-        def display_headers() -> None:
-            for header_key, header_value in response.headers.multi_items():
-                self.response_area.headers_data_table.add_row(
-                    header_key, header_value
+            raw = request_area_data.body.payload
+            if headers['content-type'] == ContentType.JSON:
+                try:
+                    raw = json.dumps(raw)
+                except Exception:
+                    pass
+
+            return http_client.build_request(
+                method=url_area_data.method,
+                url=url_area_data.url,
+                headers=headers,
+                params=query_params,
+                content=raw,
+            )
+        elif request_area_data.body.type == BodyMode.FILE:
+            file = request_area_data.body.payload
+            if 'content-type' not in headers:
+                headers['content-type'] = (
+                    mimetypes.guess_type(file.name)[0]
+                    or 'application/octet-stream'
                 )
-
-        def display_body() -> None:
-            resp_content_type: str = response.headers.get('Content-Type', '')
-            body_text_language = resp_content_type.rsplit('/')[1].lower()
-            self.response_area.body_type_select.value = body_text_language
-            self.response_area.body_text_area.language = body_text_language
-            self.response_area.body_text_area.insert(response.text)
-            self.response_area.body_text_area.scroll_home(
-                animate=False, force=True, immediate=True
+            return http_client.build_request(
+                method=url_area_data.method,
+                url=url_area_data.url,
+                headers=headers,
+                params=query_params,
+                content=file.read_bytes(),
+            )
+        elif request_area_data.body.type == BodyMode.FORM_URLENCODED:
+            form_urlencoded = {
+                form_item.key: form_item.value
+                for form_item in request_area_data.body.payload
+                if form_item.enabled
+            }
+            return http_client.build_request(
+                method=url_area_data.method,
+                url=url_area_data.url,
+                headers=headers,
+                params=query_params,
+                data=form_urlencoded,
+            )
+        elif request_area_data.body.type == BodyMode.FORM_MULTIPART:
+            form_multipart_str = {
+                form_item.key: form_item.value
+                for form_item in request_area_data.body.payload
+                if form_item.enabled and isinstance(form_item.value, str)
+            }
+            form_multipart_files = {
+                form_item.key: (
+                    form_item.value.name,
+                    form_item.value.read_bytes(),
+                    mimetypes.guess_type(form_item.value.name)[0]
+                    or 'application/octet-stream',
+                )
+                for form_item in request_area_data.body.payload
+                if form_item.enabled and isinstance(form_item.value, Path)
+            }
+            return http_client.build_request(
+                method=url_area_data.method,
+                url=url_area_data.url,
+                headers=headers,
+                params=query_params,
+                data=form_multipart_str,
+                files=form_multipart_files,
             )
 
-        display_status()
-        display_size_and_elapsed_time()
-        display_headers()
-        display_body()
+    def _display_response(self, response: httpx.Response) -> None:
+        status = HTTPStatus(response.status_code)
+        size = response.num_bytes_downloaded
+        elapsed_time = round(response.elapsed.total_seconds(), 2)
+        headers = {
+            header_key: header_value
+            for header_key, header_value in response.headers.multi_items()
+        }
+        content_type_to_body_language = {
+            ContentType.TEXT: BodyRawLanguage.PLAIN,
+            ContentType.HTML: BodyRawLanguage.HTML,
+            ContentType.JSON: BodyRawLanguage.JSON,
+            ContentType.YAML: BodyRawLanguage.YAML,
+            ContentType.XML: BodyRawLanguage.XML,
+        }
+        body_raw_language = content_type_to_body_language.get(
+            response.headers.get('Content-Type'), BodyRawLanguage.PLAIN
+        )
+        body_raw = response.text
+        self.response_area.set_data(
+            data=ResponseAreaData(
+                status=status,
+                size=size,
+                elapsed_time=elapsed_time,
+                headers=headers,
+                body_raw_language=body_raw_language,
+                body_raw=body_raw,
+            )
+        )
