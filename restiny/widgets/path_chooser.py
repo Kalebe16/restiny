@@ -55,6 +55,7 @@ class PathChooserScreen(ModalScreen):
             with Horizontal(classes='w-auto h-auto mt-1'):
                 yield Input(
                     placeholder='--empty--',
+                    select_on_focus=False,
                     disabled=True,
                     type='text',
                     classes='w-1fr',
@@ -252,6 +253,7 @@ class PathChooser(Widget):
         yield Input(
             self._initial_path,
             placeholder='--empty--',
+            select_on_focus=False,
             disabled=True,
             id='path',
         )
