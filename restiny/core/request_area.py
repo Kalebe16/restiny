@@ -282,8 +282,10 @@ class RequestArea(Static):
                         '5.5',
                         placeholder='5.5',
                         select_on_focus=False,
-                        id='options-timeout',
+                        type='number',
+                        valid_empty=True,
                         classes='w-1fr',
+                        id='options-timeout',
                     )
                 with Horizontal(classes='mt-1 h-auto'):
                     yield Switch(id='options-follow-redirects')
@@ -403,20 +405,6 @@ class RequestArea(Static):
         else:
             self.body_enabled_switch.value = True
 
-    @on(Input.Changed, '#options-timeout')
-    def _on_change_timeout(self, message: Input.Changed) -> None:
-        new_value = message.value
-
-        if new_value == '':
-            return
-
-        try:
-            float(new_value)
-        except Exception:
-            self.options_timeout_input.value = (
-                self.options_timeout_input.value[:-1]
-            )
-
     def _get_headers(self) -> list[HeaderField]:
         return [
             HeaderField(
@@ -507,9 +495,10 @@ class RequestArea(Static):
         )
 
     def _get_options(self) -> Options:
-        timeout = None
-        if self.options_timeout_input.value:
+        try:
             timeout = float(self.options_timeout_input.value)
+        except ValueError:
+            timeout = None
 
         return Options(
             timeout=timeout,
