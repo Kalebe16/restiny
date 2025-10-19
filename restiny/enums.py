@@ -41,3 +41,10 @@ class ContentType(StrEnum):
     XML = 'application/xml'
     FORM_URLENCODED = 'application/x-www-form-urlencoded'
     FORM_MULTIPART = 'multipart/form-data'
+
+
+class AuthMode(StrEnum):
+    BASIC = 'basic'
+    BEARER = 'bearer'
+    API_KEY = 'api_key'
+    DIGEST = 'digest'

@@ -8,32 +8,43 @@ import httpx
 def build_curl_cmd(
     method: str,
     url: str,
-    headers: dict[str, str] = {},
-    params: dict[str, str] = {},
-    raw_body: str | None = None,
-    form_urlencoded: dict[str, str] = {},
-    form_multipart: dict[str, str | Path] = {},
-    files: list[Path] = [],
+    headers: dict[str, str] | None = None,
+    params: dict[str, str] | None = None,
+    body_raw: str | None = None,
+    body_form_urlencoded: dict[str, str] | None = None,
+    body_form_multipart: dict[str, str | Path] | None = None,
+    body_files: list[Path] | None = None,
+    auth_basic: tuple[str, str] | None = None,
+    auth_bearer: str | None = None,
+    auth_api_key_header: tuple[str, str] | None = None,
+    auth_api_key_param: tuple[str, str] | None = None,
+    auth_digest: tuple[str, str] | None = None,
 ) -> str:
     cmd_parts = ['curl']
+
+    # Method
     cmd_parts.extend(['--request', method])
 
-    url = str(httpx.URL(url).copy_merge_params(params))
+    # URL + Params
+    if params:
+        url = str(httpx.URL(url).copy_merge_params(params))
     cmd_parts.extend(['--url', shlex.quote(url)])
 
+    # Headers
     for header_key, header_value in headers.items():
         header = f'{header_key}: {header_value}'
         cmd_parts.extend(['--header', shlex.quote(header)])
 
-    if raw_body:
-        cmd_parts.extend(['--data', shlex.quote(raw_body)])
-    elif form_urlencoded:
-        for form_key, form_value in form_urlencoded.items():
+    # Body
+    if body_raw:
+        cmd_parts.extend(['--data', shlex.quote(body_raw)])
+    elif body_form_urlencoded:
+        for form_key, form_value in body_form_urlencoded.items():
             cmd_parts.extend(
                 ['--data', shlex.quote(f'{form_key}={form_value}')]
             )
-    elif form_multipart:
-        for form_key, form_value in form_multipart.items():
+    elif body_form_multipart:
+        for form_key, form_value in body_form_multipart.items():
             if isinstance(form_value, str):
                 cmd_parts.extend(
                     ['--form', shlex.quote(f'{form_key}={form_value}')]
@@ -42,9 +53,28 @@ def build_curl_cmd(
                 cmd_parts.extend(
                     ['--form', shlex.quote(f'{form_key}=@{form_value}')]
                 )
-    elif files:
-        for file in files:
+    elif body_files:
+        for file in body_files:
             cmd_parts.extend(['--data', shlex.quote(f'@{file}')])
+
+    # Auth
+    if auth_basic:
+        user, pwd = auth_basic
+        cmd_parts.extend(['--user', shlex.quote(f'{user}:{pwd}')])
+    elif auth_bearer:
+        token = auth_bearer
+        cmd_parts.extend(['--header', shlex.quote(f'Authorization: {token}')])
+    elif auth_api_key_header:
+        key, value = auth_api_key_header
+        cmd_parts.extend(['--header', shlex.quote(f'{key}: {value}')])
+    elif auth_api_key_param:
+        key, value = auth_api_key_param
+        url_arg_index = cmd_parts.index('--url')
+        new_url = str(httpx.URL(url).copy_merge_params({key: value}))
+        cmd_parts[url_arg_index + 1] = shlex.quote(new_url)
+    elif auth_digest:
+        user, pwd = auth_digest
+        cmd_parts.extend(['--digest', '--user', shlex.quote(f'{user}:{pwd}')])
 
     return ' '.join(cmd_parts)
 
