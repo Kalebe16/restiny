@@ -14,6 +14,7 @@ from textual.events import DescendantFocus
 from textual.widget import Widget
 from textual.widgets import Footer, Header
 
+from restiny import httpx_auths
 from restiny.__about__ import __version__
 from restiny.assets import STYLE_TCSS
 from restiny.core import (
@@ -22,6 +23,12 @@ from restiny.core import (
     ResponseArea,
     URLArea,
     URLAreaData,
+)
+from restiny.core.request_area import (
+    APIKeyAuth,
+    BasicAuth,
+    BearerAuth,
+    DigestAuth,
 )
 from restiny.core.response_area import ResponseAreaData
 from restiny.enums import BodyMode, BodyRawLanguage, ContentType
@@ -64,10 +71,8 @@ class RESTinyApp(App, inherit_bindings=False):
             with Horizontal(classes='h-auto'):
                 yield URLArea()
             with Horizontal(classes='h-1fr'):
-                with Vertical():
-                    yield RequestArea()
-                with Vertical():
-                    yield ResponseArea()
+                yield RequestArea()
+                yield ResponseArea()
         yield Footer()
 
     def on_mount(self) -> None:
@@ -96,42 +101,78 @@ class RESTinyApp(App, inherit_bindings=False):
             headers[header.key] = header.value
 
         params = {}
-        for param in request_area_data.query_params:
+        for param in request_area_data.params:
             if not param.enabled:
                 continue
 
             params[param.key] = param.value
 
-        raw_body = None
-        form_urlencoded = {}
-        form_multipart = {}
-        files = None
-        if request_area_data.body.type == BodyMode.RAW:
-            raw_body = request_area_data.body.payload
-        elif request_area_data.body.type == BodyMode.FORM_URLENCODED:
-            form_urlencoded = {
-                form_field.key: form_field.value
-                for form_field in request_area_data.body.payload
-                if form_field.enabled
-            }
-        elif request_area_data.body.type == BodyMode.FORM_MULTIPART:
-            form_multipart = {
-                form_field.key: form_field.value
-                for form_field in request_area_data.body.payload
-                if form_field.enabled
-            }
-        elif request_area_data.body.type == BodyMode.FILE:
-            files = [request_area_data.body.payload]
+        body_raw = None
+        body_form_urlencoded = {}
+        body_form_multipart = {}
+        body_files = None
+        if request_area_data.body.enabled:
+            if request_area_data.body.mode == BodyMode.RAW:
+                body_raw = request_area_data.body.payload
+            elif request_area_data.body.mode == BodyMode.FORM_URLENCODED:
+                body_form_urlencoded = {
+                    form_field.key: form_field.value
+                    for form_field in request_area_data.body.payload
+                    if form_field.enabled
+                }
+            elif request_area_data.body.mode == BodyMode.FORM_MULTIPART:
+                body_form_multipart = {
+                    form_field.key: form_field.value
+                    for form_field in request_area_data.body.payload
+                    if form_field.enabled
+                }
+            elif request_area_data.body.mode == BodyMode.FILE:
+                body_files = [request_area_data.body.payload]
+
+        auth_basic = None
+        auth_bearer = None
+        auth_api_key_header = None
+        auth_api_key_param = None
+        auth_digest = None
+        if request_area_data.auth.enabled:
+            if isinstance(request_area_data.auth.value, BasicAuth):
+                auth_basic = (
+                    request_area_data.auth.value.username,
+                    request_area_data.auth.value.password,
+                )
+            elif isinstance(request_area_data.auth.value, BearerAuth):
+                auth_bearer = request_area_data.auth.value.token
+            elif isinstance(request_area_data.auth.value, APIKeyAuth):
+                if request_area_data.auth.value.where == 'header':
+                    auth_api_key_header = (
+                        request_area_data.auth.value.key,
+                        request_area_data.auth.value.value,
+                    )
+                elif request_area_data.auth.value.where == 'param':
+                    auth_api_key_param = (
+                        request_area_data.auth.value.key,
+                        request_area_data.auth.value.value,
+                    )
+            elif isinstance(request_area_data.auth.value, DigestAuth):
+                auth_digest = (
+                    request_area_data.auth.value.username,
+                    request_area_data.auth.value.password,
+                )
 
         curl_cmd = build_curl_cmd(
             method=method,
             url=url,
             headers=headers,
             params=params,
-            raw_body=raw_body,
-            form_urlencoded=form_urlencoded,
-            form_multipart=form_multipart,
-            files=files,
+            body_raw=body_raw,
+            body_form_urlencoded=body_form_urlencoded,
+            body_form_multipart=body_form_multipart,
+            body_files=body_files,
+            auth_basic=auth_basic,
+            auth_bearer=auth_bearer,
+            auth_api_key_header=auth_api_key_header,
+            auth_api_key_param=auth_api_key_param,
+            auth_digest=auth_digest,
         )
         self.copy_to_clipboard(curl_cmd)
         self.notify(
@@ -195,7 +236,10 @@ class RESTinyApp(App, inherit_bindings=False):
                     url_area_data=url_area_data,
                     request_area_data=request_area_data,
                 )
-                response = await http_client.send(request=request)
+                auth = self._build_auth(
+                    request_area_data=request_area_data,
+                )
+                response = await http_client.send(request=request, auth=auth)
                 self._display_response(response=response)
                 self.response_area.is_showing_response = True
         except httpx.RequestError as error:
@@ -216,18 +260,18 @@ class RESTinyApp(App, inherit_bindings=False):
 
     def _build_request(
         self,
-        http_client: httpx.Client,
+        http_client: httpx.AsyncClient,
         url_area_data: URLAreaData,
         request_area_data: RequestAreaData,
-    ) -> httpx.Request:
+    ) -> tuple[httpx.Request, httpx.Auth | None]:
         headers: dict[str, str] = {
             header.key: header.value
             for header in request_area_data.headers
             if header.enabled
         }
-        query_params: dict[str, str] = {
+        params: dict[str, str] = {
             param.key: param.value
-            for param in request_area_data.query_params
+            for param in request_area_data.params
             if param.enabled
         }
 
@@ -236,10 +280,10 @@ class RESTinyApp(App, inherit_bindings=False):
                 method=url_area_data.method,
                 url=url_area_data.url,
                 headers=headers,
-                params=query_params,
+                params=params,
             )
 
-        if request_area_data.body.type == BodyMode.RAW:
+        if request_area_data.body.mode == BodyMode.RAW:
             raw_language_to_content_type = {
                 BodyRawLanguage.JSON: ContentType.JSON,
                 BodyRawLanguage.YAML: ContentType.YAML,
@@ -262,10 +306,10 @@ class RESTinyApp(App, inherit_bindings=False):
                 method=url_area_data.method,
                 url=url_area_data.url,
                 headers=headers,
-                params=query_params,
+                params=params,
                 content=raw,
             )
-        elif request_area_data.body.type == BodyMode.FILE:
+        elif request_area_data.body.mode == BodyMode.FILE:
             file = request_area_data.body.payload
             if 'content-type' not in headers:
                 headers['content-type'] = (
@@ -276,10 +320,10 @@ class RESTinyApp(App, inherit_bindings=False):
                 method=url_area_data.method,
                 url=url_area_data.url,
                 headers=headers,
-                params=query_params,
+                params=params,
                 content=file.read_bytes(),
             )
-        elif request_area_data.body.type == BodyMode.FORM_URLENCODED:
+        elif request_area_data.body.mode == BodyMode.FORM_URLENCODED:
             form_urlencoded = {
                 form_item.key: form_item.value
                 for form_item in request_area_data.body.payload
@@ -289,10 +333,10 @@ class RESTinyApp(App, inherit_bindings=False):
                 method=url_area_data.method,
                 url=url_area_data.url,
                 headers=headers,
-                params=query_params,
+                params=params,
                 data=form_urlencoded,
             )
-        elif request_area_data.body.type == BodyMode.FORM_MULTIPART:
+        elif request_area_data.body.mode == BodyMode.FORM_MULTIPART:
             form_multipart_str = {
                 form_item.key: form_item.value
                 for form_item in request_area_data.body.payload
@@ -312,9 +356,40 @@ class RESTinyApp(App, inherit_bindings=False):
                 method=url_area_data.method,
                 url=url_area_data.url,
                 headers=headers,
-                params=query_params,
+                params=params,
                 data=form_multipart_str,
                 files=form_multipart_files,
+            )
+
+    def _build_auth(
+        self,
+        request_area_data: RequestAreaData,
+    ) -> httpx.Auth | None:
+        auth = request_area_data.auth
+
+        if not auth.enabled:
+            return
+
+        if isinstance(auth.value, BasicAuth):
+            return httpx.BasicAuth(
+                username=auth.value.username,
+                password=auth.value.password,
+            )
+        elif isinstance(auth.value, BearerAuth):
+            return httpx_auths.BearerAuth(token=auth.value.token)
+        elif isinstance(auth.value, APIKeyAuth):
+            if auth.value.where == 'header':
+                return httpx_auths.APIKeyHeaderAuth(
+                    key=auth.value.key, value=auth.value.value
+                )
+            elif auth.value.where == 'param':
+                return httpx_auths.APIKeyParamAuth(
+                    key=auth.value.key, value=auth.value.value
+                )
+        elif isinstance(auth.value, DigestAuth):
+            return httpx.DigestAuth(
+                username=auth.value.username,
+                password=auth.value.password,
             )
 
     def _display_response(self, response: httpx.Response) -> None:

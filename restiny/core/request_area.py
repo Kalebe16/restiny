@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from textual import on
 from textual.app import ComposeResult
@@ -15,10 +16,11 @@ from textual.widgets import (
     TabPane,
 )
 
-from restiny.enums import BodyMode, BodyRawLanguage
+from restiny.enums import AuthMode, BodyMode, BodyRawLanguage
 from restiny.widgets import (
     CustomTextArea,
     DynamicFields,
+    PasswordInput,
     PathChooser,
     TextDynamicField,
 )
@@ -33,7 +35,7 @@ class HeaderField:
 
 
 @dataclass
-class QueryParamField:
+class ParamField:
     enabled: bool
     key: str
     value: str
@@ -54,28 +56,64 @@ class FormMultipartField:
 
 
 @dataclass
+class BasicAuth:
+    username: str
+    password: str
+
+
+@dataclass
+class BearerAuth:
+    token: str
+
+
+@dataclass
+class APIKeyAuth:
+    key: str
+    value: str
+    where: Literal['header', 'param']
+
+
+@dataclass
+class DigestAuth:
+    username: str
+    password: str
+
+
+@dataclass
+class Options:
+    timeout: int | float | None
+    follow_redirects: bool
+    verify_ssl: bool
+
+
+@dataclass
+class Body:
+    enabled: bool
+    raw_language: BodyRawLanguage | None
+    mode: BodyMode
+    payload: (
+        str
+        | Path
+        | list[FormUrlEncodedField]
+        | list[FormMultipartField]
+        | None
+    )
+
+
+_AuthType = BasicAuth | BearerAuth | APIKeyAuth | DigestAuth
+
+
+@dataclass
+class Auth:
+    enabled: bool
+    value: _AuthType
+
+
+@dataclass
 class RequestAreaData:
-    @dataclass
-    class Options:
-        timeout: int | float | None
-        follow_redirects: bool
-        verify_ssl: bool
-
-    @dataclass
-    class Body:
-        enabled: bool
-        raw_language: BodyRawLanguage | None
-        type: BodyMode
-        payload: (
-            str
-            | Path
-            | list[FormUrlEncodedField]
-            | list[FormMultipartField]
-            | None
-        )
-
     headers: list[HeaderField]
-    query_params: list[QueryParamField]
+    params: list[ParamField]
+    auth: Auth
     body: Body
     options: Options
 
@@ -101,11 +139,80 @@ class RequestArea(Static):
                     fields=[TextDynamicField(enabled=False, key='', value='')],
                     id='headers',
                 )
-            with TabPane('Query params'):
+            with TabPane('Params'):
                 yield DynamicFields(
                     fields=[TextDynamicField(enabled=False, key='', value='')],
                     id='params',
                 )
+            with TabPane('Auth'):
+                with Horizontal(classes='h-auto'):
+                    yield Switch(tooltip='Enabled', id='auth-enabled')
+                    yield Select(
+                        (
+                            ('Basic', AuthMode.BASIC),
+                            ('Bearer', AuthMode.BEARER),
+                            ('API Key', AuthMode.API_KEY),
+                            ('Digest', AuthMode.DIGEST),
+                        ),
+                        allow_blank=False,
+                        tooltip='Auth mode',
+                        id='auth-mode',
+                    )
+                with ContentSwitcher(
+                    initial='auth-basic', id='auth-mode-switcher'
+                ):
+                    with Horizontal(id='auth-basic', classes='mt-1'):
+                        yield Input(
+                            placeholder='Username',
+                            select_on_focus=False,
+                            classes='w-1fr',
+                            id='auth-basic-username',
+                        )
+                        yield PasswordInput(
+                            placeholder='Password',
+                            select_on_focus=False,
+                            classes='w-2fr',
+                            id='auth-basic-password',
+                        )
+                    with Horizontal(id='auth-bearer', classes='mt-1'):
+                        yield PasswordInput(
+                            placeholder='Token',
+                            select_on_focus=False,
+                            id='auth-bearer-token',
+                        )
+                    with Horizontal(id='auth-api-key', classes='mt-1'):
+                        yield Select(
+                            (('Header', 'header'), ('Param', 'param')),
+                            allow_blank=False,
+                            tooltip='Where',
+                            classes='w-1fr',
+                            id='auth-api-key-where',
+                        )
+                        yield Input(
+                            placeholder='Key',
+                            classes='w-2fr',
+                            id='auth-api-key-key',
+                        )
+                        yield PasswordInput(
+                            placeholder='Value',
+                            classes='w-3fr',
+                            id='auth-api-key-value',
+                        )
+
+                    with Horizontal(id='auth-digest', classes='mt-1'):
+                        yield Input(
+                            placeholder='Username',
+                            select_on_focus=False,
+                            classes='w-1fr',
+                            id='auth-digest-username',
+                        )
+                        yield PasswordInput(
+                            placeholder='Password',
+                            select_on_focus=False,
+                            classes='w-2fr',
+                            id='auth-digest-password',
+                        )
+
             with TabPane('Body'):
                 with Horizontal(classes='h-auto'):
                     yield Switch(id='body-enabled', tooltip='Send body?')
@@ -117,7 +224,7 @@ class RequestArea(Static):
                             ('Form (multipart)', BodyMode.FORM_MULTIPART),
                         ),
                         allow_blank=False,
-                        tooltip='Body type',
+                        tooltip='Body mode',
                         id='body-mode',
                     )
                 with ContentSwitcher(
@@ -175,8 +282,10 @@ class RequestArea(Static):
                         '5.5',
                         placeholder='5.5',
                         select_on_focus=False,
-                        id='options-timeout',
+                        type='number',
+                        valid_empty=True,
                         classes='w-1fr',
+                        id='options-timeout',
                     )
                 with Horizontal(classes='mt-1 h-auto'):
                     yield Switch(id='options-follow-redirects')
@@ -189,6 +298,36 @@ class RequestArea(Static):
         self.header_fields = self.query_one('#headers', DynamicFields)
 
         self.param_fields = self.query_one('#params', DynamicFields)
+
+        self.auth_enabled_switch = self.query_one('#auth-enabled', Switch)
+        self.auth_mode_switcher = self.query_one(
+            '#auth-mode-switcher', ContentSwitcher
+        )
+        self.auth_mode_select = self.query_one('#auth-mode', Select)
+        self.auth_basic_username_input = self.query_one(
+            '#auth-basic-username', Input
+        )
+        self.auth_basic_password_input = self.query_one(
+            '#auth-basic-password', PasswordInput
+        )
+        self.auth_bearer_token_input = self.query_one(
+            '#auth-bearer-token', PasswordInput
+        )
+        self.auth_api_key_key_input = self.query_one(
+            '#auth-api-key-key', Input
+        )
+        self.auth_api_key_value_input = self.query_one(
+            '#auth-api-key-value', PasswordInput
+        )
+        self.auth_api_key_where_select = self.query_one(
+            '#auth-api-key-where', Select
+        )
+        self.auth_digest_username_input = self.query_one(
+            '#auth-digest-username', Input
+        )
+        self.auth_digest_password_input = self.query_one(
+            '#auth-digest-password', PasswordInput
+        )
 
         self.body_enabled_switch = self.query_one('#body-enabled', Switch)
         self.body_mode_select = self.query_one('#body-mode', Select)
@@ -218,13 +357,25 @@ class RequestArea(Static):
     def get_data(self) -> RequestAreaData:
         return RequestAreaData(
             headers=self._get_headers(),
-            query_params=self._get_query_params(),
+            params=self._get_params(),
+            auth=self._get_auth(),
             body=self._get_body(),
             options=self._get_options(),
         )
 
+    @on(Select.Changed, '#auth-mode')
+    def _on_change_auth_mode(self, message: Select.Changed) -> None:
+        if message.value == 'basic':
+            self.auth_mode_switcher.current = 'auth-basic'
+        elif message.value == 'bearer':
+            self.auth_mode_switcher.current = 'auth-bearer'
+        elif message.value == 'api_key':
+            self.auth_mode_switcher.current = 'auth-api-key'
+        elif message.value == 'digest':
+            self.auth_mode_switcher.current = 'auth-digest'
+
     @on(Select.Changed, '#body-mode')
-    def _on_change_body_type(self, message: Select.Changed) -> None:
+    def _on_change_body_mode(self, message: Select.Changed) -> None:
         if message.value == BodyMode.FILE:
             self.body_mode_switcher.current = 'body-mode-file'
         elif message.value == BodyMode.RAW:
@@ -254,20 +405,6 @@ class RequestArea(Static):
         else:
             self.body_enabled_switch.value = True
 
-    @on(Input.Changed, '#options-timeout')
-    def _on_change_timeout(self, message: Input.Changed) -> None:
-        new_value = message.value
-
-        if new_value == '':
-            return
-
-        try:
-            float(new_value)
-        except Exception:
-            self.options_timeout_input.value = (
-                self.options_timeout_input.value[:-1]
-            )
-
     def _get_headers(self) -> list[HeaderField]:
         return [
             HeaderField(
@@ -278,26 +415,58 @@ class RequestArea(Static):
             for header_field in self.header_fields.values
         ]
 
-    def _get_query_params(self) -> list[QueryParamField]:
+    def _get_params(self) -> list[ParamField]:
         return [
-            QueryParamField(
-                enabled=query_param_field['enabled'],
-                key=query_param_field['key'],
-                value=query_param_field['value'],
+            ParamField(
+                enabled=param_field['enabled'],
+                key=param_field['key'],
+                value=param_field['value'],
             )
-            for query_param_field in self.param_fields.values
+            for param_field in self.param_fields.values
         ]
 
-    def _get_body(self) -> RequestAreaData.Body:
+    def _get_auth(self) -> _AuthType:
+        if self.auth_mode_select.value == AuthMode.BASIC:
+            return Auth(
+                enabled=self.auth_enabled_switch.value,
+                value=BasicAuth(
+                    username=self.auth_basic_username_input.value,
+                    password=self.auth_basic_password_input.value,
+                ),
+            )
+        elif self.auth_mode_select.value == AuthMode.BEARER:
+            return Auth(
+                enabled=self.auth_enabled_switch.value,
+                value=BearerAuth(token=self.auth_bearer_token_input.value),
+            )
+        elif self.auth_mode_select.value == AuthMode.API_KEY:
+            return Auth(
+                enabled=self.auth_enabled_switch.value,
+                value=APIKeyAuth(
+                    key=self.auth_api_key_key_input.value,
+                    value=self.auth_api_key_value_input.value,
+                    where=self.auth_api_key_where_select.value,
+                ),
+            )
+        elif self.auth_mode_select.value == AuthMode.DIGEST:
+            return Auth(
+                enabled=self.auth_enabled_switch.value,
+                value=DigestAuth(
+                    username=self.auth_digest_username_input.value,
+                    password=self.auth_digest_password_input.value,
+                ),
+            )
+
+    def _get_body(self) -> Body:
         body_send: bool = self.body_enabled_switch.value
-        body_type: str = BodyMode(self.body_mode_select.value)
+        body_mode: str = BodyMode(self.body_mode_select.value)
 
         payload = None
-        if body_type == BodyMode.RAW:
+        if body_mode == BodyMode.RAW:
             payload = self.body_raw_editor.text
-        elif body_type == BodyMode.FILE:
+        elif body_mode == BodyMode.FILE:
             payload = self.body_file_path_chooser.path
-        elif body_type == BodyMode.FORM_URLENCODED:
+        elif body_mode == BodyMode.FORM_URLENCODED:
             payload = []
             for form_item in self.body_form_urlencoded_fields.values:
                 payload.append(
@@ -307,7 +476,7 @@ class RequestArea(Static):
                         value=form_item['value'],
                     )
                 )
-        elif body_type == BodyMode.FORM_MULTIPART:
+        elif body_mode == BodyMode.FORM_MULTIPART:
             payload = []
             for form_item in self.body_form_multipart_fields.values:
                 payload.append(
@@ -318,19 +487,20 @@ class RequestArea(Static):
                     )
                 )
 
-        return RequestAreaData.Body(
+        return Body(
             enabled=body_send,
             raw_language=BodyRawLanguage(self.body_raw_language_select.value),
-            type=body_type,
+            mode=body_mode,
             payload=payload,
         )
 
-    def _get_options(self) -> RequestAreaData.Options:
-        timeout = None
-        if self.options_timeout_input.value:
+    def _get_options(self) -> Options:
+        try:
             timeout = float(self.options_timeout_input.value)
+        except ValueError:
+            timeout = None
 
-        return RequestAreaData.Options(
+        return Options(
             timeout=timeout,
             follow_redirects=self.options_follow_redirects_switch.value,
             verify_ssl=self.options_verify_ssl_switch.value,
