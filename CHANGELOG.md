@@ -5,11 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [unreleased]
+
+### Added
+
+- Added `Ctrl+A` shortcut to select all text in input fields.
+- Added collections support.
+
 ## [0.3.0] - 2025-10-19
 
 ### Added
 
-- Added authentication support (Basic, Bearer, API Key, Digest)
+- Added authentication support (Basic, Bearer, API Key, Digest).
 
 ### Fixed
 
