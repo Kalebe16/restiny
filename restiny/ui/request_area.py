@@ -1,6 +1,4 @@
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 from textual import on
 from textual.app import ComposeResult
@@ -23,99 +21,8 @@ from restiny.widgets import (
     PasswordInput,
     PathChooser,
     TextDynamicField,
+    TextOrFileDynamicField,
 )
-from restiny.widgets.dynamic_fields import TextOrFileDynamicField
-
-
-@dataclass
-class HeaderField:
-    enabled: bool
-    key: str
-    value: str
-
-
-@dataclass
-class ParamField:
-    enabled: bool
-    key: str
-    value: str
-
-
-@dataclass
-class FormUrlEncodedField:
-    enabled: bool
-    key: str
-    value: str
-
-
-@dataclass
-class FormMultipartField:
-    enabled: bool
-    key: str
-    value: str | Path
-
-
-@dataclass
-class BasicAuth:
-    username: str
-    password: str
-
-
-@dataclass
-class BearerAuth:
-    token: str
-
-
-@dataclass
-class APIKeyAuth:
-    key: str
-    value: str
-    where: Literal['header', 'param']
-
-
-@dataclass
-class DigestAuth:
-    username: str
-    password: str
-
-
-@dataclass
-class Options:
-    timeout: int | float | None
-    follow_redirects: bool
-    verify_ssl: bool
-
-
-@dataclass
-class Body:
-    enabled: bool
-    raw_language: BodyRawLanguage | None
-    mode: BodyMode
-    payload: (
-        str
-        | Path
-        | list[FormUrlEncodedField]
-        | list[FormMultipartField]
-        | None
-    )
-
-
-_AuthType = BasicAuth | BearerAuth | APIKeyAuth | DigestAuth
-
-
-@dataclass
-class Auth:
-    enabled: bool
-    value: _AuthType
-
-
-@dataclass
-class RequestAreaData:
-    headers: list[HeaderField]
-    params: list[ParamField]
-    auth: Auth
-    body: Body
-    options: Options
 
 
 class RequestArea(Static):
@@ -356,14 +263,274 @@ class RequestArea(Static):
             '#options-verify-ssl', Switch
         )
 
-    def get_data(self) -> RequestAreaData:
-        return RequestAreaData(
-            headers=self._get_headers(),
-            params=self._get_params(),
-            auth=self._get_auth(),
-            body=self._get_body(),
-            options=self._get_options(),
-        )
+    @property
+    def headers(self) -> list[dict[str, str | bool]]:
+        return [
+            {
+                'enabled': header.enabled,
+                'key': header.key,
+                'value': header.value,
+            }
+            for header in self.header_fields.fields
+            if header.is_filled or header.enabled
+        ]
+
+    @headers.setter
+    def headers(self, headers: list[dict[str, str | bool]]) -> None:
+        for field in self.header_fields.fields:
+            self.header_fields.remove_field(field=field)
+
+        for header in headers:
+            self.run_worker(
+                self.header_fields.add_field(
+                    field=TextDynamicField(
+                        enabled=header['enabled'],
+                        key=header['key'],
+                        value=header['value'],
+                    ),
+                    before_last=True,
+                )
+            )
+
+    @property
+    def params(self) -> list[dict[str, str | bool]]:
+        return [
+            {
+                'enabled': param.enabled,
+                'key': param.key,
+                'value': param.value,
+            }
+            for param in self.param_fields.fields
+            if param.is_filled or param.enabled
+        ]
+
+    @params.setter
+    def params(self, params: list[dict[str, str | bool]]) -> None:
+        for field in self.param_fields.fields:
+            self.param_fields.remove_field(field=field)
+
+        for param in params:
+            self.run_worker(
+                self.param_fields.add_field(
+                    field=TextDynamicField(
+                        enabled=param['enabled'],
+                        key=param['key'],
+                        value=param['value'],
+                    ),
+                    before_last=True,
+                )
+            )
+
+    @property
+    def auth_enabled(self) -> bool:
+        return self.auth_enabled_switch.value
+
+    @auth_enabled.setter
+    def auth_enabled(self, value: bool) -> None:
+        self.auth_enabled_switch.value = value
+
+    @property
+    def auth_mode(self) -> AuthMode:
+        return self.auth_mode_select.value
+
+    @auth_mode.setter
+    def auth_mode(self, value: AuthMode) -> None:
+        self.auth_mode_select.value = value
+
+    @property
+    def auth_basic_username(self) -> str:
+        return self.auth_basic_username_input.value
+
+    @auth_basic_username.setter
+    def auth_basic_username(self, value: str) -> None:
+        self.auth_basic_username_input.value = value
+
+    @property
+    def auth_basic_password(self) -> str:
+        return self.auth_basic_password_input.value
+
+    @auth_basic_password.setter
+    def auth_basic_password(self, value: str) -> None:
+        self.auth_basic_password_input.value = value
+
+    @property
+    def auth_bearer_token(self) -> str:
+        return self.auth_bearer_token_input.value
+
+    @auth_bearer_token.setter
+    def auth_bearer_token(self, value: str) -> None:
+        self.auth_bearer_token_input.value = value
+
+    @property
+    def auth_api_key_key(self) -> str:
+        return self.auth_api_key_key_input.value
+
+    @auth_api_key_key.setter
+    def auth_api_key_key(self, value: str) -> None:
+        self.auth_api_key_key_input.value = value
+
+    @property
+    def auth_api_key_value(self) -> str:
+        return self.auth_api_key_value_input.value
+
+    @auth_api_key_value.setter
+    def auth_api_key_value(self, value: str) -> None:
+        self.auth_api_key_value_input.value = value
+
+    @property
+    def auth_api_key_where(self) -> str:
+        return self.auth_api_key_where_select.value
+
+    @auth_api_key_where.setter
+    def auth_api_key_where(self, value: str) -> None:
+        self.auth_api_key_where_select.value = value
+
+    @property
+    def auth_digest_username(self) -> str:
+        return self.auth_digest_username_input.value
+
+    @auth_digest_username.setter
+    def auth_digest_username(self, value: str) -> None:
+        self.auth_digest_username_input.value = value
+
+    @property
+    def auth_digest_password(self) -> str:
+        return self.auth_digest_password_input.value
+
+    @auth_digest_password.setter
+    def auth_digest_password(self, value: str) -> None:
+        self.auth_digest_password_input.value = value
+
+    @property
+    def body_enabled(self) -> bool:
+        return self.body_enabled_switch.value
+
+    @body_enabled.setter
+    def body_enabled(self, value: bool) -> None:
+        self.body_enabled_switch.value = value
+
+    @property
+    def body_mode(self) -> BodyMode:
+        return self.body_mode_select.value
+
+    @body_mode.setter
+    def body_mode(self, value: BodyMode) -> None:
+        self.body_mode_select.value = value
+
+    @property
+    def body_raw_language(self) -> BodyRawLanguage:
+        return self.body_raw_language_select.value
+
+    @body_raw_language.setter
+    def body_raw_language(self, value: BodyRawLanguage) -> None:
+        self.body_raw_language_select.value = value
+
+    @property
+    def body_raw(self) -> str:
+        return self.body_raw_editor.text
+
+    @body_raw.setter
+    def body_raw(self, value: str) -> None:
+        self.body_raw_editor.text = value
+
+    @property
+    def body_file(self) -> Path | None:
+        return self.body_file_path_chooser.path
+
+    @body_file.setter
+    def body_file(self, value: Path | None) -> None:
+        self.body_file_path_chooser.path = value
+
+    @property
+    def body_form_urlencoded(self) -> list[dict[str, str | bool]]:
+        return [
+            {
+                'enabled': field.enabled,
+                'key': field.key,
+                'value': field.value,
+            }
+            for field in self.body_form_urlencoded_fields.fields
+            if field.is_filled or field.enabled
+        ]
+
+    @body_form_urlencoded.setter
+    def body_form_urlencoded(
+        self, values: list[dict[str, str | bool]]
+    ) -> None:
+        for field in self.body_form_urlencoded_fields.fields:
+            self.body_form_urlencoded_fields.remove_field(field=field)
+
+        for value in values:
+            self.run_worker(
+                self.body_form_urlencoded_fields.add_field(
+                    field=TextDynamicField(
+                        enabled=value['enabled'],
+                        key=value['key'],
+                        value=value['value'],
+                    ),
+                    before_last=True,
+                )
+            )
+
+    @property
+    def body_form_multipart(self) -> list[dict[str, str | bool, Path | None]]:
+        return [
+            {
+                'enabled': field.enabled,
+                'key': field.key,
+                'value': field.value,
+                'value_kind': field.value_kind,
+            }
+            for field in self.body_form_multipart_fields.fields
+            if field.is_filled or field.enabled
+        ]
+
+    @body_form_multipart.setter
+    def body_form_multipart(
+        self, values: list[dict[str, str | bool, Path | None]]
+    ) -> None:
+        for field in self.body_form_multipart_fields.fields:
+            self.body_form_multipart_fields.remove_field(field=field)
+
+        for value in values:
+            self.run_worker(
+                self.body_form_multipart_fields.add_field(
+                    TextOrFileDynamicField(
+                        enabled=value['enabled'],
+                        key=value['key'],
+                        value=value['value'],
+                        value_kind=value['value_kind'],
+                    ),
+                    before_last=True,
+                )
+            )
+
+    @property
+    def option_timeout(self) -> float | None:
+        try:
+            return float(self.options_timeout_input.value)
+        except ValueError:
+            return None
+
+    @option_timeout.setter
+    def option_timeout(self, value: float | None) -> None:
+        self.options_timeout_input.value = value
+
+    @property
+    def option_follow_redirects(self) -> bool:
+        return self.options_follow_redirects_switch.value
+
+    @option_follow_redirects.setter
+    def option_follow_redirects(self, value: bool) -> None:
+        self.options_follow_redirects_switch.value = value
+
+    @property
+    def option_verify_ssl(self) -> bool:
+        return self.options_verify_ssl_switch.value
+
+    @option_verify_ssl.setter
+    def option_verify_ssl(self, value: bool) -> None:
+        self.options_verify_ssl_switch.value = value
 
     @on(Select.Changed, '#auth-mode')
     def _on_change_auth_mode(self, message: Select.Changed) -> None:
@@ -406,104 +573,3 @@ class RequestArea(Static):
             self.body_enabled_switch.value = False
         else:
             self.body_enabled_switch.value = True
-
-    def _get_headers(self) -> list[HeaderField]:
-        return [
-            HeaderField(
-                enabled=header_field['enabled'],
-                key=header_field['key'],
-                value=header_field['value'],
-            )
-            for header_field in self.header_fields.values
-        ]
-
-    def _get_params(self) -> list[ParamField]:
-        return [
-            ParamField(
-                enabled=param_field['enabled'],
-                key=param_field['key'],
-                value=param_field['value'],
-            )
-            for param_field in self.param_fields.values
-        ]
-
-    def _get_auth(self) -> _AuthType:
-        if self.auth_mode_select.value == AuthMode.BASIC:
-            return Auth(
-                enabled=self.auth_enabled_switch.value,
-                value=BasicAuth(
-                    username=self.auth_basic_username_input.value,
-                    password=self.auth_basic_password_input.value,
-                ),
-            )
-        elif self.auth_mode_select.value == AuthMode.BEARER:
-            return Auth(
-                enabled=self.auth_enabled_switch.value,
-                value=BearerAuth(token=self.auth_bearer_token_input.value),
-            )
-        elif self.auth_mode_select.value == AuthMode.API_KEY:
-            return Auth(
-                enabled=self.auth_enabled_switch.value,
-                value=APIKeyAuth(
-                    key=self.auth_api_key_key_input.value,
-                    value=self.auth_api_key_value_input.value,
-                    where=self.auth_api_key_where_select.value,
-                ),
-            )
-        elif self.auth_mode_select.value == AuthMode.DIGEST:
-            return Auth(
-                enabled=self.auth_enabled_switch.value,
-                value=DigestAuth(
-                    username=self.auth_digest_username_input.value,
-                    password=self.auth_digest_password_input.value,
-                ),
-            )
-
-    def _get_body(self) -> Body:
-        body_send: bool = self.body_enabled_switch.value
-        body_mode: str = BodyMode(self.body_mode_select.value)
-
-        payload = None
-        if body_mode == BodyMode.RAW:
-            payload = self.body_raw_editor.text
-        elif body_mode == BodyMode.FILE:
-            payload = self.body_file_path_chooser.path
-        elif body_mode == BodyMode.FORM_URLENCODED:
-            payload = []
-            for form_item in self.body_form_urlencoded_fields.values:
-                payload.append(
-                    FormUrlEncodedField(
-                        enabled=form_item['enabled'],
-                        key=form_item['key'],
-                        value=form_item['value'],
-                    )
-                )
-        elif body_mode == BodyMode.FORM_MULTIPART:
-            payload = []
-            for form_item in self.body_form_multipart_fields.values:
-                payload.append(
-                    FormMultipartField(
-                        enabled=form_item['enabled'],
-                        key=form_item['key'],
-                        value=form_item['value'],
-                    )
-                )
-
-        return Body(
-            enabled=body_send,
-            raw_language=BodyRawLanguage(self.body_raw_language_select.value),
-            mode=body_mode,
-            payload=payload,
-        )
-
-    def _get_options(self) -> Options:
-        try:
-            timeout = float(self.options_timeout_input.value)
-        except ValueError:
-            timeout = None
-
-        return Options(
-            timeout=timeout,
-            follow_redirects=self.options_follow_redirects_switch.value,
-            verify_ssl=self.options_verify_ssl_switch.value,
-        )

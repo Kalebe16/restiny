@@ -142,24 +142,24 @@ class TextDynamicField(DynamicField):
         self, enabled: bool, key: str, value: str, *args, **kwargs
     ) -> None:
         super().__init__(*args, **kwargs)
-        self._initial_enabled = enabled
-        self._initial_key = key
-        self._initial_value = value
+        self._enabled = enabled
+        self._key = key
+        self._value = value
 
     def compose(self) -> ComposeResult:
         yield Switch(
-            value=self._initial_enabled,
+            value=self._enabled,
             tooltip='Send this field?',
             id='enabled',
         )
         yield CustomInput(
-            value=self._initial_key,
+            value=self._key,
             placeholder='Key',
             select_on_focus=False,
             id='key',
         )
         yield CustomInput(
-            value=self._initial_value,
+            value=self._value,
             placeholder='Value',
             select_on_focus=False,
             id='value',
@@ -260,51 +260,51 @@ class TextOrFileDynamicField(DynamicField):
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self._initial_enabled = enabled
-        self._initial_key = key
-        self._initial_value = value
-        self._initial_value_kind = value_kind
+        self._enabled = enabled
+        self._key = key
+        self._value = value
+        self._value_kind = value_kind
 
     def compose(self) -> ComposeResult:
         with RadioSet(id='value-kind', compact=True):
             yield RadioButton(
                 label=_ValueKind.TEXT,
-                value=bool(self._initial_value_kind == _ValueKind.TEXT),
+                value=bool(self._value_kind == _ValueKind.TEXT),
                 id='value-kind-text',
             )
             yield RadioButton(
                 label=_ValueKind.FILE,
-                value=bool(self._initial_value_kind == _ValueKind.FILE),
+                value=bool(self._value_kind == _ValueKind.FILE),
                 id='value-kind-file',
             )
         yield Switch(
-            value=self._initial_enabled,
+            value=self._enabled,
             tooltip='Send this field?',
             id='enabled',
         )
         yield CustomInput(
-            value=self._initial_key,
+            value=self._key,
             placeholder='Key',
             select_on_focus=False,
             id='key',
         )
         with ContentSwitcher(
             initial='value-text'
-            if self._initial_value_kind == _ValueKind.TEXT
+            if self._value_kind == _ValueKind.TEXT
             else 'value-file',
             id='value-kind-switcher',
         ):
             yield CustomInput(
-                value=self._initial_value
-                if self._initial_value_kind == _ValueKind.TEXT
+                value=self._value
+                if self._value_kind == _ValueKind.TEXT
                 else '',
                 placeholder='Value',
                 select_on_focus=False,
                 id='value-text',
             )
             yield PathChooser.file(
-                path=self._initial_value
-                if self._initial_value_kind == _ValueKind.FILE
+                path=self._value
+                if self._value_kind == _ValueKind.FILE
                 else None,
                 id='value-file',
             )
@@ -493,27 +493,41 @@ class DynamicFields(Widget):
     def filled_fields(self) -> list[DynamicField]:
         return [field for field in self.fields if field.is_filled]
 
-    @property
-    def values(self) -> list[dict[str, str | bool | Path | None]]:
-        return [
-            {
-                'enabled': field.enabled,
-                'key': field.key,
-                'value': field.value,
-            }
-            for field in self.fields
-        ]
+    async def add_field(
+        self, field: DynamicField, before_last: bool = False
+    ) -> None:
+        if before_last:
+            await self.fields_container.mount(field, before=self.fields[-1])
+        else:
+            await self.fields_container.mount(field)
 
-    async def add_field(self, field: DynamicField) -> None:
-        await self.fields_container.mount(field)
+    def remove_field(
+        self, field: DynamicField, focus_neighbor: bool = False
+    ) -> None:
+        if len(self.fields) == 1:
+            self.app.bell()
+            return
+        elif field is self.fields[-1]:
+            self.app.bell()
+            return
 
-    def remove_field(self, field: DynamicField) -> None:
+        if focus_neighbor:
+            field_index = self.fields.index(field)
+
+            neighbor_field = None
+            if field_index == 0:
+                neighbor_field = self.fields[field_index + 1]
+            else:
+                neighbor_field = self.fields[field_index - 1]
+
+            self.app.set_focus(neighbor_field.query_one(CustomInput))
+
         field.add_class('hidden')
         field.remove()
 
     @on(DynamicField.Empty)
     def _on_field_is_empty(self, message: DynamicField.Empty) -> None:
-        self._focus_neighbor_field_then_remove(field=message.field)
+        self.remove_field(field=message.field, focus_neighbor=True)
         self.post_message(
             message=self.FieldEmpty(fields=self, field=message.field)
         )
@@ -544,23 +558,4 @@ class DynamicFields(Widget):
     def _on_field_remove_requested(
         self, message: DynamicField.RemoveRequested
     ) -> None:
-        self._focus_neighbor_field_then_remove(field=message.field)
-
-    def _focus_neighbor_field_then_remove(self, field: DynamicField) -> None:
-        if len(self.fields) == 1:
-            self.app.bell()
-            return
-        elif field is self.fields[-1]:
-            self.app.bell()
-            return
-
-        field_index = self.fields.index(field)
-
-        neighbor_field = None
-        if field_index == 0:
-            neighbor_field = self.fields[field_index + 1]
-        else:
-            neighbor_field = self.fields[field_index - 1]
-
-        self.app.set_focus(neighbor_field.query_one(CustomInput))
-        self.remove_field(field=field)
+        self.remove_field(field=message.field, focus_neighbor=True)
