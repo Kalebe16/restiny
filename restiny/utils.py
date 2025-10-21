@@ -132,3 +132,10 @@ def first_char_non_empty(text: str) -> int | None:
 
 def seconds_to_milliseconds(seconds: int | float) -> int:
     return round(seconds * 1000)
+
+
+def shorten_string(value: str, max_lenght: int, elipsis: str = '..') -> str:
+    if len(value) <= max_lenght:
+        return value
+
+    return value[: max_lenght - len(elipsis)] + elipsis
