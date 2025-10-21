@@ -3,6 +3,7 @@ This module contains reusable widgets used in the DataFox interface.
 """
 
 from restiny.widgets.custom_directory_tree import CustomDirectoryTree
+from restiny.widgets.custom_iinput import CustomInput
 from restiny.widgets.custom_text_area import CustomTextArea
 from restiny.widgets.dynamic_fields import DynamicFields, TextDynamicField
 from restiny.widgets.password_input import PasswordInput
@@ -15,4 +16,5 @@ __all__ = [
     'CustomTextArea',
     'PathChooser',
     'PasswordInput',
+    'CustomInput',
 ]
