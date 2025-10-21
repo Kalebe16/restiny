@@ -10,12 +10,12 @@ from textual.widget import Widget
 from textual.widgets import (
     Button,
     ContentSwitcher,
-    Input,
     RadioButton,
     RadioSet,
     Switch,
 )
 
+from restiny.widgets import CustomInput
 from restiny.widgets.path_chooser import PathChooser
 
 
@@ -152,13 +152,13 @@ class TextDynamicField(DynamicField):
             tooltip='Send this field?',
             id='enabled',
         )
-        yield Input(
+        yield CustomInput(
             value=self._initial_key,
             placeholder='Key',
             select_on_focus=False,
             id='key',
         )
-        yield Input(
+        yield CustomInput(
             value=self._initial_value,
             placeholder='Value',
             select_on_focus=False,
@@ -168,8 +168,8 @@ class TextDynamicField(DynamicField):
 
     async def on_mount(self) -> None:
         self.enabled_switch = self.query_one('#enabled', Switch)
-        self.key_input = self.query_one('#key', Input)
-        self.value_input = self.query_one('#value', Input)
+        self.key_input = self.query_one('#key', CustomInput)
+        self.value_input = self.query_one('#value', CustomInput)
         self.remove_button = self.query_one('#remove', Button)
 
     @property
@@ -211,9 +211,9 @@ class TextDynamicField(DynamicField):
         elif message.value is False:
             self.post_message(message=self.Disabled(field=self))
 
-    @on(Input.Changed, '#key')
-    @on(Input.Changed, '#value')
-    def on_input_changed(self, message: Input.Changed) -> None:
+    @on(CustomInput.Changed, '#key')
+    @on(CustomInput.Changed, '#value')
+    def on_input_changed(self, message: CustomInput.Changed) -> None:
         self.enabled_switch.value = True
 
         if self.is_empty:
@@ -282,7 +282,7 @@ class TextOrFileDynamicField(DynamicField):
             tooltip='Send this field?',
             id='enabled',
         )
-        yield Input(
+        yield CustomInput(
             value=self._initial_key,
             placeholder='Key',
             select_on_focus=False,
@@ -294,7 +294,7 @@ class TextOrFileDynamicField(DynamicField):
             else 'value-file',
             id='value-kind-switcher',
         ):
-            yield Input(
+            yield CustomInput(
                 value=self._initial_value
                 if self._initial_value_kind == _ValueKind.TEXT
                 else '',
@@ -323,8 +323,8 @@ class TextOrFileDynamicField(DynamicField):
             '#value-kind-file', RadioButton
         )
         self.enabled_switch = self.query_one('#enabled', Switch)
-        self.key_input = self.query_one('#key', Input)
-        self.value_text_input = self.query_one('#value-text', Input)
+        self.key_input = self.query_one('#key', CustomInput)
+        self.value_text_input = self.query_one('#value-text', CustomInput)
         self.value_file_input = self.query_one('#value-file', PathChooser)
         self.remove_button = self.query_one('#remove', Button)
 
@@ -403,11 +403,11 @@ class TextOrFileDynamicField(DynamicField):
         elif message.value is False:
             self.post_message(message=self.Disabled(field=self))
 
-    @on(Input.Changed, '#key')
-    @on(Input.Changed, '#value-text')
+    @on(CustomInput.Changed, '#key')
+    @on(CustomInput.Changed, '#value-text')
     @on(PathChooser.Changed, '#value-file')
     def on_input_changed(
-        self, message: Input.Changed | PathChooser.Changed
+        self, message: CustomInput.Changed | PathChooser.Changed
     ) -> None:
         self.enabled_switch.value = True
 
@@ -562,5 +562,5 @@ class DynamicFields(Widget):
         else:
             neighbor_field = self.fields[field_index - 1]
 
-        self.app.set_focus(neighbor_field.query_one(Input))
+        self.app.set_focus(neighbor_field.query_one(CustomInput))
         self.remove_field(field=field)

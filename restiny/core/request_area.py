@@ -7,7 +7,6 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.widgets import (
     ContentSwitcher,
-    Input,
     Label,
     Select,
     Static,
@@ -18,6 +17,7 @@ from textual.widgets import (
 
 from restiny.enums import AuthMode, BodyMode, BodyRawLanguage
 from restiny.widgets import (
+    CustomInput,
     CustomTextArea,
     DynamicFields,
     PasswordInput,
@@ -162,7 +162,7 @@ class RequestArea(Static):
                     initial='auth-basic', id='auth-mode-switcher'
                 ):
                     with Horizontal(id='auth-basic', classes='mt-1'):
-                        yield Input(
+                        yield CustomInput(
                             placeholder='Username',
                             select_on_focus=False,
                             classes='w-1fr',
@@ -188,7 +188,7 @@ class RequestArea(Static):
                             classes='w-1fr',
                             id='auth-api-key-where',
                         )
-                        yield Input(
+                        yield CustomInput(
                             placeholder='Key',
                             classes='w-2fr',
                             id='auth-api-key-key',
@@ -200,7 +200,7 @@ class RequestArea(Static):
                         )
 
                     with Horizontal(id='auth-digest', classes='mt-1'):
-                        yield Input(
+                        yield CustomInput(
                             placeholder='Username',
                             select_on_focus=False,
                             classes='w-1fr',
@@ -278,7 +278,7 @@ class RequestArea(Static):
             with TabPane('Options'):
                 with Horizontal(classes='h-auto'):
                     yield Label('Timeout', classes='pt-1 ml-1')
-                    yield Input(
+                    yield CustomInput(
                         '5.5',
                         placeholder='5.5',
                         select_on_focus=False,
@@ -305,7 +305,7 @@ class RequestArea(Static):
         )
         self.auth_mode_select = self.query_one('#auth-mode', Select)
         self.auth_basic_username_input = self.query_one(
-            '#auth-basic-username', Input
+            '#auth-basic-username', CustomInput
         )
         self.auth_basic_password_input = self.query_one(
             '#auth-basic-password', PasswordInput
@@ -314,7 +314,7 @@ class RequestArea(Static):
             '#auth-bearer-token', PasswordInput
         )
         self.auth_api_key_key_input = self.query_one(
-            '#auth-api-key-key', Input
+            '#auth-api-key-key', CustomInput
         )
         self.auth_api_key_value_input = self.query_one(
             '#auth-api-key-value', PasswordInput
@@ -323,7 +323,7 @@ class RequestArea(Static):
             '#auth-api-key-where', Select
         )
         self.auth_digest_username_input = self.query_one(
-            '#auth-digest-username', Input
+            '#auth-digest-username', CustomInput
         )
         self.auth_digest_password_input = self.query_one(
             '#auth-digest-password', PasswordInput
@@ -346,7 +346,9 @@ class RequestArea(Static):
             '#body-form-multipart', DynamicFields
         )
 
-        self.options_timeout_input = self.query_one('#options-timeout', Input)
+        self.options_timeout_input = self.query_one(
+            '#options-timeout', CustomInput
+        )
         self.options_follow_redirects_switch = self.query_one(
             '#options-follow-redirects', Switch
         )
