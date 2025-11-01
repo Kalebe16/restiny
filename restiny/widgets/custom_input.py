@@ -6,7 +6,12 @@ from textual.widgets import Input
 
 class CustomInput(Input):
     BINDINGS = [
-        Binding('ctrl+a', 'select_all', 'Select all text'),
+        Binding(
+            key='ctrl+a',
+            action='select_all',
+            description='Select all text',
+            show=False,
+        ),
     ]
 
     @on(Blur)
