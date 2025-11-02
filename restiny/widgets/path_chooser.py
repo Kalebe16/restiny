@@ -9,10 +9,10 @@ from textual.message import Message
 from textual.reactive import Reactive
 from textual.screen import ModalScreen
 from textual.widget import Widget
-from textual.widgets import Button, Input, Label, Switch
+from textual.widgets import Button, Label, Switch
 
 from restiny.utils import filter_paths
-from restiny.widgets import CustomDirectoryTree
+from restiny.widgets import CustomDirectoryTree, CustomInput
 
 
 class PathChooserScreen(ModalScreen):
@@ -53,7 +53,7 @@ class PathChooserScreen(ModalScreen):
                 yield CustomDirectoryTree(path='/')
 
             with Horizontal(classes='w-auto h-auto mt-1'):
-                yield Input(
+                yield CustomInput(
                     placeholder='--empty--',
                     select_on_focus=False,
                     disabled=True,
@@ -74,7 +74,7 @@ class PathChooserScreen(ModalScreen):
             '#option-show-hidden-dirs'
         )
         self.directory_tree = self.query_one(CustomDirectoryTree)
-        self.input = self.query_one(Input)
+        self.input = self.query_one(CustomInput)
         self.btn_cancel = self.query_one('#cancel')
         self.btn_confirm = self.query_one('#choose')
 
@@ -197,7 +197,7 @@ class PathChooser(Widget):
         grid-columns: 1fr auto;
     }
 
-    PathChooser > Input {
+    PathChooser > CustomInput {
         margin-right: 0;
         border-right: none;
     }
@@ -241,7 +241,7 @@ class PathChooser(Widget):
     ) -> None:
         super().__init__(*args, **kwargs)
         self.path_type = path_type
-        self._initial_path = path
+        self._path = path
 
     def compose(self) -> ComposeResult:
         icon = ''
@@ -250,8 +250,8 @@ class PathChooser(Widget):
         elif self.path_type == _PathType.DIR:
             icon = ' 🗂 '
 
-        yield Input(
-            self._initial_path,
+        yield CustomInput(
+            str(self._path) if self._path else '',
             placeholder='--empty--',
             select_on_focus=False,
             disabled=True,
@@ -260,7 +260,7 @@ class PathChooser(Widget):
         yield Button(icon, tooltip=f'Choose {self.path_type}', id='choose')
 
     def on_mount(self) -> None:
-        self.path_input = self.query_one('#path', Input)
+        self.path_input = self.query_one('#path', CustomInput)
         self.choose_button = self.query_one('#choose', Button)
 
     @property
@@ -275,8 +275,8 @@ class PathChooser(Widget):
         self.path_input.value = value
         self.path_input.tooltip = value
 
-    @on(Input.Changed, '#path')
-    def _on_path_changed(self, message: Input.Changed) -> None:
+    @on(CustomInput.Changed, '#path')
+    def _on_path_changed(self, message: CustomInput.Changed) -> None:
         self.post_message(
             message=self.Changed(path_chooser=self, path=self.path)
         )

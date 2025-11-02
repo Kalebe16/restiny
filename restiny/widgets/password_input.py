@@ -5,7 +5,9 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import Button, Input
+from textual.widgets import Button
+
+from restiny.widgets import CustomInput
 
 
 class _Icon(StrEnum):
@@ -30,13 +32,13 @@ class PasswordInput(Widget):
         height: auto;
     }
 
-    PasswordInput Input {
+    PasswordInput CustomInput {
         width: 1fr;
         margin-right: 0;
         border-right: none;
     }
 
-    PasswordInput Input:focus {
+    PasswordInput CustomInput:focus {
         border-right: none;
     }
 
@@ -99,7 +101,7 @@ class PasswordInput(Widget):
 
     def compose(self) -> ComposeResult:
         with Horizontal():
-            yield Input(
+            yield CustomInput(
                 *self._input_args,
                 **self._input_kwargs,
                 password=True,
@@ -110,7 +112,7 @@ class PasswordInput(Widget):
             )
 
     def on_mount(self) -> None:
-        self.value_input = self.query_one('#value', Input)
+        self.value_input = self.query_one('#value', CustomInput)
         self.toggle_visibility_button = self.query_one(
             '#toggle-visibility', Button
         )
@@ -143,8 +145,8 @@ class PasswordInput(Widget):
     def hidden(self) -> bool:
         return not self.shown
 
-    @on(Input.Changed, '#value')
-    def _on_value_changed(self, message: Input.Changed) -> None:
+    @on(CustomInput.Changed, '#value')
+    def _on_value_changed(self, message: CustomInput.Changed) -> None:
         self.post_message(
             message=self.Changed(input=self, value=message.value)
         )
