@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 from textual import on
 from textual.app import ComposeResult
 from textual.message import Message
@@ -7,12 +5,6 @@ from textual.widgets import Button, ContentSwitcher, Select, Static
 
 from restiny.enums import HTTPMethod
 from restiny.widgets import CustomInput
-
-
-@dataclass
-class URLAreaData:
-    method: str
-    url: str
 
 
 class URLArea(Static):
@@ -82,12 +74,6 @@ class URLArea(Static):
         self.send_request_button = self.query_one('#send-request', Button)
         self.cancel_request_button = self.query_one('#cancel-request', Button)
 
-    def get_data(self) -> URLAreaData:
-        return URLAreaData(
-            method=self.method_select.value,
-            url=self.url_input.value,
-        )
-
     @property
     def request_pending(self) -> bool:
         return self._request_pending
@@ -100,6 +86,22 @@ class URLArea(Static):
             self._request_button_switcher.current = 'send-request'
 
         self._request_pending = value
+
+    @property
+    def method(self) -> HTTPMethod:
+        return self.method_select.value
+
+    @method.setter
+    def method(self, value: HTTPMethod) -> None:
+        self.method_select.value = value
+
+    @property
+    def url(self) -> str:
+        return self.url_input.value
+
+    @url.setter
+    def url(self, value: str) -> None:
+        self.url_input.value = value
 
     @on(Button.Pressed, '#send-request')
     @on(CustomInput.Submitted, '#url')

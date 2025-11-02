@@ -241,7 +241,7 @@ class PathChooser(Widget):
     ) -> None:
         super().__init__(*args, **kwargs)
         self.path_type = path_type
-        self._initial_path = path
+        self._path = path
 
     def compose(self) -> ComposeResult:
         icon = ''
@@ -251,7 +251,7 @@ class PathChooser(Widget):
             icon = ' 🗂 '
 
         yield CustomInput(
-            self._initial_path,
+            str(self._path) if self._path else '',
             placeholder='--empty--',
             select_on_focus=False,
             disabled=True,
