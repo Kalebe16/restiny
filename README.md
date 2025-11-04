@@ -1,5 +1,6 @@
 ![OS support](https://img.shields.io/badge/OS-macOS%20Linux%20Windows-red)
-![Python versions](https://img.shields.io/badge/Python-3.10%20|%203.11%20|%203.12%20|%203.13%20|%203.14-blue)
+![Python versions](https://img.shields.io/badge/Python-3.11%20|%203.12%20|%203.13%20|%203.14-blue)
+
 
 
 - [RESTiny](#restiny)
