@@ -1,5 +1,6 @@
 from textual import on
 from textual.app import ComposeResult
+from textual.containers import Horizontal
 from textual.message import Message
 from textual.widgets import Button, ContentSwitcher, Select, Static
 
@@ -13,9 +14,8 @@ class URLArea(Static):
     BORDER_TITLE = 'URL'
     DEFAULT_CSS = """
     URLArea {
-        layout: grid;
-        grid-size: 3 1;
-        grid-columns: 1fr 6fr 1fr;
+        width: 1fr;
+        height: auto;
         border: heavy black;
         border-title-color: gray;
     }
@@ -42,27 +42,34 @@ class URLArea(Static):
         self._request_pending = False
 
     def compose(self) -> ComposeResult:
-        yield Select.from_values(
-            values=HTTPMethod.values(), allow_blank=False, id='method'
-        )
-        yield CustomInput(
-            placeholder='Enter URL', select_on_focus=False, id='url'
-        )
-        with ContentSwitcher(
-            id='request-button-switcher', initial='send-request'
-        ):
-            yield Button(
-                label='Send Request',
-                id='send-request',
+        with Horizontal(classes='h-auto'):
+            yield Select.from_values(
+                values=HTTPMethod.values(),
+                allow_blank=False,
                 classes='w-1fr',
-                variant='default',
+                id='method',
             )
-            yield Button(
-                label='Cancel Request',
-                id='cancel-request',
-                classes='w-1fr',
-                variant='error',
+            yield CustomInput(
+                placeholder='Enter URL',
+                select_on_focus=False,
+                classes='w-5fr',
+                id='url',
             )
+            with ContentSwitcher(
+                id='request-button-switcher', initial='send-request'
+            ):
+                yield Button(
+                    label='Send Request',
+                    id='send-request',
+                    classes='w-1fr',
+                    variant='default',
+                )
+                yield Button(
+                    label='Cancel Request',
+                    id='cancel-request',
+                    classes='w-1fr',
+                    variant='error',
+                )
 
     def on_mount(self) -> None:
         self._request_button_switcher = self.query_one(
