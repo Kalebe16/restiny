@@ -137,6 +137,10 @@ class RESTinyApp(App, inherit_bindings=False):
         self.notify('Saved changes', severity='information')
 
     def action_maximize_or_minimize_area(self) -> None:
+        if not self.last_focused_maximizable_area:
+            self.notify('No area focused', severity='warning')
+            return
+
         if self.screen.maximized:
             self.screen.minimize()
         else:
