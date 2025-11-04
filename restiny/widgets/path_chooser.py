@@ -214,7 +214,7 @@ class PathChooser(Widget):
         """
 
         def __init__(
-            self, path_chooser: PathChooser, path: Path | None
+            self, path_chooser: 'PathChooser', path: Path | None
         ) -> None:
             super().__init__()
             self.path_chooser = path_chooser
