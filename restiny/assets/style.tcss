@@ -27,6 +27,18 @@ Input {
     width: 3fr;
 }
 
+.w-4fr {
+    width: 4fr;
+}
+
+.w-5fr {
+    width: 5fr;
+}
+
+.w-6fr {
+    width: 6fr;
+}
+
 .h-auto {
     height: auto;
 }
@@ -41,6 +53,18 @@ Input {
 
 .h-3fr {
     height: 3fr;
+}
+
+.h-4fr {
+    height: 4fr;
+}
+
+.h-5fr {
+    height: 5fr;
+}
+
+.h-6fr {
+    height: 6fr;
 }
 
 .p-0 {
