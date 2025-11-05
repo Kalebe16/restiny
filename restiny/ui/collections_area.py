@@ -18,11 +18,12 @@ from textual.widgets import (
 )
 
 from restiny.entities import Folder, Request
+from restiny.enums import HTTPMethod
 from restiny.widgets import (
+    CollectionsTree,
     ConfirmPrompt,
     ConfirmPromptResult,
     CustomInput,
-    CustomTree,
 )
 
 if TYPE_CHECKING:
@@ -347,11 +348,11 @@ class CollectionsArea(Widget):
                 "[i]No collections yet. Press [b]'ctrl+n'[/] to create your first one.[/]",
                 id='no-content',
             )
-            yield CustomTree('Collections', id='content')
+            yield CollectionsTree('Collections', id='content')
 
     def on_mount(self) -> None:
         self.content_switcher = self.query_one(ContentSwitcher)
-        self.collections_tree = self.query_one(CustomTree)
+        self.collections_tree = self.query_one(CollectionsTree)
         self.border_title = 'Collections'
 
         self._populate_children(node=self.collections_tree.root)
@@ -362,7 +363,7 @@ class CollectionsArea(Widget):
             (parent['path'], parent['id'])
             for parent in self._resolve_all_folder_paths()
         ]
-        parent_id = self.collections_tree.current_expandable_node.data['id']
+        parent_id = self.collections_tree.current_folder.data['id']
         self.app.push_screen(
             screen=_AddScreen(parents=parents, parent_id=parent_id),
             callback=self._on_prompt_add_result,
@@ -389,7 +390,7 @@ class CollectionsArea(Widget):
                 for parent in self._resolve_all_folder_paths()
             ]
 
-        parent_id = self.collections_tree.current_parent_node.data['id']
+        parent_id = self.collections_tree.current_parent_folder.data['id']
         self.app.push_screen(
             screen=_UpdateScreen(
                 kind=kind,
@@ -412,12 +413,12 @@ class CollectionsArea(Widget):
             callback=self._on_prompt_delete_result,
         )
 
-    @on(CustomTree.NodeExpanded)
-    def _on_node_expanded(self, message: CustomTree.NodeExpanded) -> None:
+    @on(CollectionsTree.NodeExpanded)
+    def _on_node_expanded(self, message: CollectionsTree.NodeExpanded) -> None:
         self._populate_children(node=message.node)
 
-    @on(CustomTree.NodeSelected)
-    def _on_node_selected(self, message: CustomTree.NodeSelected) -> None:
+    @on(CollectionsTree.NodeSelected)
+    def _on_node_selected(self, message: CollectionsTree.NodeSelected) -> None:
         if message.node.allow_expand:
             self.post_message(
                 message=self.FolderSelected(folder_id=message.node.data['id'])
@@ -515,17 +516,30 @@ class CollectionsArea(Widget):
         folders = self.app.folders_repo.list_by_parent_id(folder_id).data
         requests = self.app.requests_repo.list_by_folder_id(folder_id).data
 
-        for item in sorted(
-            folders + requests, key=lambda item: item.name.lower()
-        ):
-            if isinstance(item, Request):
-                self.collections_tree.add_leaf_node(
-                    parent_node=node, name=item.name, id=item.id
-                )
-            elif isinstance(item, Folder):
-                self.collections_tree.add_node(
-                    parent_node=node, name=item.name, id=item.id
-                )
+        def sort_requests(request: Request) -> tuple:
+            methods = [method.value for method in HTTPMethod]
+            method_order = {
+                method: index for index, method in enumerate(methods)
+            }
+            return (method_order[request.method], request.name.lower())
+
+        sorted_folders = sorted(
+            folders, key=lambda folder: folder.name.lower()
+        )
+        sorted_requests = sorted(requests, key=sort_requests)
+
+        for folder in sorted_folders:
+            self.collections_tree.add_folder(
+                parent_node=node, name=folder.name, id=folder.id
+            )
+
+        for request in sorted_requests:
+            self.collections_tree.add_request(
+                parent_node=node,
+                method=request.method,
+                name=request.name,
+                id=request.id,
+            )
 
     def _resolve_all_folder_paths(self) -> list[dict[str, str | int | None]]:
         paths: list[dict[str, str | int | None]] = [{'path': '/', 'id': None}]

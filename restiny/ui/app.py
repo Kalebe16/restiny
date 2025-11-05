@@ -154,6 +154,9 @@ class RESTinyApp(App, inherit_bindings=False):
     def action_save(self) -> None:
         req = self.get_request()
         self.requests_repo.update(request=req)
+        self.collections_area._populate_children(
+            self.collections_area.collections_tree.current_parent_folder
+        )
         self.notify('Saved changes', severity='information')
 
     def action_maximize_or_minimize_area(self) -> None:
