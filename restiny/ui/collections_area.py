@@ -286,11 +286,12 @@ class CollectionsArea(Widget):
     if TYPE_CHECKING:
         app: RESTinyApp
 
+    ALLOW_MAXIMIZE = True
+    focusable = True
     DEFAULT_CSS = """
     CollectionsArea {
         width: 1fr;
         height: 1fr;
-        max-width: 15%;
         border: heavy black;
         border-title-color: gray;
     }

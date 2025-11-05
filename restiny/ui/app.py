@@ -98,8 +98,8 @@ class RESTinyApp(App, inherit_bindings=False):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with Horizontal():
-            yield CollectionsArea()
-            with Vertical():
+            yield CollectionsArea(classes='w-1fr')
+            with Vertical(classes='w-6fr'):
                 with Horizontal(classes='h-auto'):
                     yield URLArea()
                 with Horizontal(classes='h-1fr'):
@@ -204,7 +204,8 @@ class RESTinyApp(App, inherit_bindings=False):
     ) -> Widget | None:
         while widget is not None:
             if (
-                isinstance(widget, URLArea)
+                isinstance(widget, CollectionsArea)
+                or isinstance(widget, URLArea)
                 or isinstance(widget, RequestArea)
                 or isinstance(widget, ResponseArea)
             ):
