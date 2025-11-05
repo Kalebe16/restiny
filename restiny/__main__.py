@@ -14,7 +14,11 @@ def prepare_textual_dev_run() -> None:
 def run_app() -> None:
     from restiny.consts import CONF_DIR, DB_FILE
     from restiny.data.db import DBManager
-    from restiny.data.repos import FoldersSQLRepo, RequestsSQLRepo
+    from restiny.data.repos import (
+        FoldersSQLRepo,
+        RequestsSQLRepo,
+        SettingsSQLRepo,
+    )
     from restiny.ui.app import RESTinyApp
 
     CONF_DIR.mkdir(exist_ok=True)
@@ -24,6 +28,7 @@ def run_app() -> None:
     RESTinyApp(
         folders_repo=FoldersSQLRepo(db_manager=db_manager),
         requests_repo=RequestsSQLRepo(db_manager=db_manager),
+        settings_repo=SettingsSQLRepo(db_manager=db_manager),
     ).run()
 
 
