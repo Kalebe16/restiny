@@ -87,6 +87,11 @@ Input {
     padding-bottom: 1;
 }
 
+.px-1 {
+    padding-left: 1;
+    padding-right: 1;
+}
+
 .m {
     margin: 0;
 }
@@ -105,5 +110,10 @@ Input {
 
 .mb-1 {
     margin-bottom: 1;
+}
+
+.mx-1 {
+    margin-left: 1;
+    margin-right: 1;
 }
 
