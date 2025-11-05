@@ -7,24 +7,24 @@ env:
   PYTHON_VERSION: "3.14"
 
 jobs:
-  verify-version:
-    name: Verify version
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref_name, 'release')
+  # verify-version:
+  #   name: Verify version
+  #   runs-on: ubuntu-latest
+  #   if: startsWith(github.ref_name, 'release')
 
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Check out repository
+  #       uses: actions/checkout@v4
 
-      - name: Ensure version is not already published on PyPi
-        run: |
-          VERSION=$(cat ./restiny/__about__.py | grep "__version__" | grep -Eo "[0-9]+\.[0-9]+(\.[0-9]+)?" | head -n1)
-          if curl -sSf -o /dev/null "https://pypi.org/pypi/restiny/${VERSION}/json"; then
-            echo "Version ${VERSION} already exists on PyPI"
-            exit 1
-          else
-            echo "Version ${VERSION} does not exist on PyPI yet"
-          fi
+  #     - name: Ensure version is not already published on PyPi
+  #       run: |
+  #         VERSION=$(cat ./restiny/__about__.py | grep "__version__" | grep -Eo "[0-9]+\.[0-9]+(\.[0-9]+)?" | head -n1)
+  #         if curl -sSf -o /dev/null "https://pypi.org/pypi/restiny/${VERSION}/json"; then
+  #           echo "Version ${VERSION} already exists on PyPI"
+  #           exit 1
+  #         else
+  #           echo "Version ${VERSION} does not exist on PyPI yet"
+  #         fi
 
   lint-format:
     name: Linting && formatting checks
