@@ -2,11 +2,11 @@
 This module contains reusable widgets used in the DataFox interface.
 """
 
+from restiny.widgets.collections_tree import CollectionsTree
 from restiny.widgets.confirm_prompt import ConfirmPrompt, ConfirmPromptResult
 from restiny.widgets.custom_directory_tree import CustomDirectoryTree
 from restiny.widgets.custom_input import CustomInput
 from restiny.widgets.custom_text_area import CustomTextArea
-from restiny.widgets.custom_tree import CustomTree
 from restiny.widgets.dynamic_fields import (
     DynamicFields,
     TextDynamicField,
@@ -24,7 +24,7 @@ __all__ = [
     'PathChooser',
     'PasswordInput',
     'CustomInput',
-    'CustomTree',
+    'CollectionsTree',
     'ConfirmPrompt',
     'ConfirmPromptResult',
 ]

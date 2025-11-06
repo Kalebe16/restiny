@@ -15,6 +15,7 @@ from restiny.enums import (
     BodyMode,
     BodyRawLanguage,
     ContentType,
+    CustomThemes,
     HTTPMethod,
 )
 from restiny.utils import build_curl_cmd
@@ -22,6 +23,7 @@ from restiny.utils import build_curl_cmd
 
 class Folder(BaseModel):
     id: int | None = None
+
     name: str
     parent_id: int | None = None
 
@@ -98,6 +100,7 @@ class Request(BaseModel):
         verify_ssl: bool = True
 
     id: int | None = None
+
     folder_id: int
     name: str
 
@@ -306,3 +309,12 @@ class Request(BaseModel):
             auth_api_key_param=auth_api_key_param,
             auth_digest=auth_digest,
         )
+
+
+class Settings(BaseModel):
+    id: int | None = None
+
+    theme: CustomThemes = CustomThemes.DARK
+
+    created_at: datetime | None = None
+    updated_at: datetime | None = None

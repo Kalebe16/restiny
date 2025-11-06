@@ -18,14 +18,14 @@ class SQLFolder(SQLModelBase):
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.current_timestamp(),
+        DateTime(),
+        default=func.current_timestamp(),
         nullable=False,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.current_timestamp(),
+        DateTime(),
+        default=func.current_timestamp(),
         onupdate=func.current_timestamp(),
         nullable=False,
     )
@@ -58,13 +58,33 @@ class SQLRequest(SQLModelBase):
     option_verify_ssl: Mapped[bool] = mapped_column()
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.current_timestamp(),
+        DateTime(),
+        default=func.current_timestamp(),
         nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.current_timestamp(),
+        DateTime(),
+        default=func.current_timestamp(),
+        onupdate=func.current_timestamp(),
+        nullable=False,
+    )
+
+
+class SQLSettings(SQLModelBase):
+    __tablename__ = 'settings'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+
+    theme: Mapped[str] = mapped_column(nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(),
+        default=func.current_timestamp(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(),
+        default=func.current_timestamp(),
         onupdate=func.current_timestamp(),
         nullable=False,
     )

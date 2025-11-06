@@ -12,8 +12,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, InterfaceError, OperationalError
 
 from restiny.data.db import DBManager
-from restiny.data.models import SQLFolder, SQLRequest
-from restiny.entities import Folder, Request
+from restiny.data.models import SQLFolder, SQLRequest, SQLSettings
+from restiny.entities import Folder, Request, Settings
 
 
 def safe_repo(func):
@@ -294,4 +294,58 @@ class RequestsSQLRepo(SQLRepoBase):
             option_verify_ssl=request.options.verify_ssl,
             created_at=request.created_at,
             updated_at=request.updated_at,
+        )
+
+
+class SettingsSQLRepo(SQLRepoBase):
+    @safe_repo
+    def get(self) -> RepoResp:
+        with self.db_manager.session_scope() as session:
+            sql_settings = session.scalar(select(SQLSettings).limit(1))
+
+            if not sql_settings:
+                return RepoResp(data=Settings())
+
+            settings = self._sql_to_settings(sql_settings)
+            return RepoResp(data=settings)
+
+    @safe_repo
+    def set(self, settings: Settings) -> RepoResp:
+        with self.db_manager.session_scope() as session:
+            sql_settings = session.scalar(select(SQLSettings).limit(1))
+
+            if not sql_settings:
+                # create
+                sql_settings = self._settings_to_sql(settings=settings)
+                session.add(sql_settings)
+                session.flush()
+                new_settings = self._sql_to_settings(sql_settings=sql_settings)
+                return RepoResp(data=new_settings)
+            else:
+                # update
+                new_data = self._settings_to_sql(settings=settings)
+                for field in self._updatable_sql_fields:
+                    setattr(sql_settings, field, getattr(new_data, field))
+                session.flush()
+                new_settings = self._sql_to_settings(sql_settings=sql_settings)
+                return RepoResp(data=new_settings)
+
+    @property
+    def _updatable_sql_fields(self) -> list[str]:
+        return [SQLSettings.theme.key]
+
+    def _sql_to_settings(self, sql_settings: SQLSettings) -> Settings:
+        return Settings(
+            id=sql_settings.id,
+            theme=sql_settings.theme,
+            created_at=sql_settings.created_at.replace(tzinfo=UTC),
+            updated_at=sql_settings.updated_at.replace(tzinfo=UTC),
+        )
+
+    def _settings_to_sql(self, settings: Settings) -> SQLSettings:
+        return SQLSettings(
+            id=settings.id,
+            theme=settings.theme,
+            created_at=settings.created_at,
+            updated_at=settings.updated_at,
         )

@@ -1,0 +1,8 @@
+CREATE TABLE settings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+  theme TEXT NOT NULL,
+
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL
+);

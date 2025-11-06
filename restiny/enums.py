@@ -6,16 +6,12 @@ class HTTPMethod(StrEnum):
     GET = 'GET'
     POST = 'POST'
     PUT = 'PUT'
+    PATCH = 'PATCH'
     DELETE = 'DELETE'
     HEAD = 'HEAD'
     OPTIONS = 'OPTIONS'
-    PATCH = 'PATCH'
     CONNECT = 'CONNECT'
     TRACE = 'TRACE'
-
-    @classmethod
-    def values(cls):
-        return [method.value for method in cls]
 
 
 class BodyMode(StrEnum):
@@ -48,3 +44,9 @@ class AuthMode(StrEnum):
     BEARER = 'bearer'
     API_KEY = 'api_key'
     DIGEST = 'digest'
+
+
+class CustomThemes(StrEnum):
+    DARK = 'dark'
+    DRACULA = 'dracula'
+    FOREST = 'forest'

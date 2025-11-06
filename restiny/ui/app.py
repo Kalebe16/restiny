@@ -13,9 +13,16 @@ from textual.widgets import Footer, Header
 
 from restiny.__about__ import __version__
 from restiny.assets import STYLE_TCSS
-from restiny.data.repos import FoldersSQLRepo, RequestsSQLRepo
-from restiny.entities import Request
-from restiny.enums import AuthMode, BodyMode, BodyRawLanguage, ContentType
+from restiny.consts import CUSTOM_THEMES
+from restiny.data.repos import FoldersSQLRepo, RequestsSQLRepo, SettingsSQLRepo
+from restiny.entities import Request, Settings
+from restiny.enums import (
+    AuthMode,
+    BodyMode,
+    BodyRawLanguage,
+    ContentType,
+    CustomThemes,
+)
 from restiny.ui import (
     CollectionsArea,
     RequestArea,
@@ -23,6 +30,8 @@ from restiny.ui import (
     URLArea,
 )
 from restiny.ui.response_area import ResponseAreaData
+from restiny.ui.settings_screen import SettingsScreen
+from restiny.widgets.custom_text_area import CustomTextArea
 
 
 class RESTinyApp(App, inherit_bindings=False):
@@ -65,30 +74,38 @@ class RESTinyApp(App, inherit_bindings=False):
             show=True,
         ),
         Binding(
+            key='f9',
+            action='copy_as_curl',
+            description='Copy as curl',
+            show=True,
+        ),
+        Binding(
             key='f10',
             action='maximize_or_minimize_area',
             description='Maximize/Minimize area',
             show=True,
         ),
         Binding(
-            key='f9',
-            action='copy_as_curl',
-            description='Copy as curl',
+            key='f12',
+            action='open_settings',
+            description='Settings',
             show=True,
         ),
     ]
-    theme = 'textual-dark'
+    # theme = 'textual-dark'
 
     def __init__(
         self,
         folders_repo: FoldersSQLRepo,
         requests_repo: RequestsSQLRepo,
+        settings_repo: SettingsSQLRepo,
         *args,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.folders_repo = folders_repo
         self.requests_repo = requests_repo
+        self.settings_repo = settings_repo
 
         self.active_request_task: asyncio.Task | None = None
         self.selected_request: Request | None = None
@@ -116,6 +133,9 @@ class RESTinyApp(App, inherit_bindings=False):
         self.url_area.disabled = True
         self.request_area.disabled = True
 
+        self._register_themes()
+        self._apply_settings()
+
     def action_toggle_collections(self) -> None:
         if self.collections_area.display:
             self.collections_area.display = False
@@ -134,6 +154,9 @@ class RESTinyApp(App, inherit_bindings=False):
     def action_save(self) -> None:
         req = self.get_request()
         self.requests_repo.update(request=req)
+        self.collections_area._populate_children(
+            self.collections_area.collections_tree.current_parent_folder
+        )
         self.notify('Saved changes', severity='information')
 
     def action_maximize_or_minimize_area(self) -> None:
@@ -159,6 +182,23 @@ class RESTinyApp(App, inherit_bindings=False):
         self.notify(
             'Command CURL copied to clipboard',
             severity='information',
+        )
+
+    def action_open_settings(self) -> None:
+        def on_settings_result(result: dict | None) -> None:
+            if not result:
+                return
+
+            self.settings_repo.set(Settings(theme=result['theme']))
+            self._apply_settings()
+
+        settings: Settings = self.settings_repo.get().data
+        self.push_screen(
+            screen=SettingsScreen(
+                themes=[theme.value for theme in CustomThemes],
+                theme=settings.theme,
+            ),
+            callback=on_settings_result,
         )
 
     def copy_to_clipboard(self, text: str) -> None:
@@ -198,6 +238,20 @@ class RESTinyApp(App, inherit_bindings=False):
         self.set_request(request=req)
         self.response_area.set_data(None)
         self.response_area.is_showing_response = False
+
+    def _apply_settings(self) -> None:
+        settings = self.settings_repo.get().data
+        self.theme = settings.theme
+        for text_area in self.query(CustomTextArea):
+            text_area.theme = settings.theme
+
+    def _register_themes(self) -> None:
+        for theme in CUSTOM_THEMES.values():
+            self.register_theme(theme=theme['global'])
+
+        for text_area in self.query(CustomTextArea):
+            for theme in CUSTOM_THEMES.values():
+                text_area.register_theme(theme=theme['text_area'])
 
     def _find_maximizable_area_by_widget(
         self, widget: Widget

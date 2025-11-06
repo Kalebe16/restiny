@@ -44,7 +44,7 @@ class URLArea(Static):
     def compose(self) -> ComposeResult:
         with Horizontal(classes='h-auto'):
             yield Select.from_values(
-                values=HTTPMethod.values(),
+                values=[method.value for method in HTTPMethod],
                 allow_blank=False,
                 classes='w-1fr',
                 id='method',
