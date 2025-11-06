@@ -6,10 +6,10 @@ class HTTPMethod(StrEnum):
     GET = 'GET'
     POST = 'POST'
     PUT = 'PUT'
+    PATCH = 'PATCH'
     DELETE = 'DELETE'
     HEAD = 'HEAD'
     OPTIONS = 'OPTIONS'
-    PATCH = 'PATCH'
     CONNECT = 'CONNECT'
     TRACE = 'TRACE'
 
@@ -50,4 +50,3 @@ class CustomThemes(StrEnum):
     DARK = 'dark'
     DRACULA = 'dracula'
     FOREST = 'forest'
-    DESERT = 'desert'
