@@ -9,7 +9,7 @@ CREATE TABLE folders (
 );
 
 -- equivalent to UNIQUE (parent_id, name)
-CREATE UNIQUE INDEX uk_folders_parent_id_name
+CREATE UNIQUE INDEX uq_folders_parent_id_name
   ON folders (IFNULL(parent_id, -1), name);
 
 CREATE TABLE IF NOT EXISTS requests (
@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS requests (
 
   method TEXT NOT NULL,
   url TEXT NULL,
-  headers JSON NULL,
-  params JSON NULL,
+  headers JSON NOT NULL DEFAULT '[]',
+  params JSON NOT NULL DEFAULT '[]',
 
   body_enabled BOOLEAN NOT NULL,
   body_mode TEXT NOT NULL,
@@ -35,10 +35,10 @@ CREATE TABLE IF NOT EXISTS requests (
   option_follow_redirects BOOLEAN NOT NULL,
   option_verify_ssl BOOLEAN NOT NULL,
 
-  created_at DATETIME DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
-  updated_at DATETIME DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL
 );
 
 -- equivalent to UNIQUE (folder_id, name)
-CREATE UNIQUE INDEX uk_requests_folder_id_name
+CREATE UNIQUE INDEX uq_requests_folder_id_name
   ON requests (IFNULL(folder_id, -1), name);

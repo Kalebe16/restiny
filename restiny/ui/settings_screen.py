@@ -7,13 +7,14 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, Select
 
+from restiny.enums import CustomThemes
+
 if TYPE_CHECKING:
     from restiny.ui.app import RESTinyApp
 
 
 class SettingsScreen(ModalScreen):
-    if TYPE_CHECKING:
-        app: RESTinyApp
+    app: 'RESTinyApp'
 
     DEFAULT_CSS = """
     SettingsScreen {
@@ -40,22 +41,14 @@ class SettingsScreen(ModalScreen):
         ),
     ]
 
-    def __init__(
-        self,
-        themes: list[str],
-        theme: str,
-    ) -> None:
-        super().__init__()
-        self._themes = themes
-        self._theme = theme
-
     def compose(self) -> ComposeResult:
+        settings = self.app.settings_repo.get().data
         with Vertical(id='modal-content'):
             with Horizontal(classes='w-auto h-auto mt-1 px-1'):
                 yield Label('theme', classes='mt-1')
                 yield Select(
-                    ((theme, theme) for theme in self._themes),
-                    value=self._theme,
+                    [(theme.value, theme.value) for theme in CustomThemes],
+                    value=settings.theme,
                     allow_blank=False,
                     id='theme',
                 )
