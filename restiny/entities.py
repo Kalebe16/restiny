@@ -124,6 +124,109 @@ class Request(BaseModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
+    def resolve_variables(
+        self, variables: list[Environment.Variable]
+    ) -> 'Request':
+        def _resolve_variables(value: str) -> str:
+            new_value = value
+            for variable in variables:
+                if not variable.enabled:
+                    continue
+
+                new_value = new_value.replace(
+                    '{{' + variable.key + '}}', variable.value
+                )
+                new_value = new_value.replace(
+                    '${' + variable.key + '}', variable.value
+                )
+            return new_value
+
+        resolved_url = _resolve_variables(self.url)
+
+        resolved_headers = [
+            self.Header(
+                enabled=header.enabled,
+                key=_resolve_variables(header.key),
+                value=_resolve_variables(header.value),
+            )
+            for header in self.headers
+        ]
+
+        resolved_params = [
+            self.Param(
+                enabled=param.enabled,
+                key=_resolve_variables(param.key),
+                value=_resolve_variables(param.value),
+            )
+            for param in self.params
+        ]
+
+        resolved_auth = self.auth
+        if self.auth_enabled:
+            if self.auth_mode == AuthMode.BASIC:
+                resolved_auth = self.BasicAuth(
+                    username=_resolve_variables(self.auth.username),
+                    password=_resolve_variables(self.auth.password),
+                )
+            elif self.auth_mode == AuthMode.BEARER:
+                resolved_auth = self.BearerAuth(
+                    token=_resolve_variables(self.auth.token)
+                )
+            elif self.auth_mode == AuthMode.API_KEY:
+                resolved_auth = self.ApiKeyAuth(
+                    key=_resolve_variables(self.auth.key),
+                    value=_resolve_variables(self.auth.value),
+                    where=self.auth.where,
+                )
+            elif self.auth_mode == AuthMode.DIGEST:
+                resolved_auth = self.DigestAuth(
+                    username=_resolve_variables(self.auth.username),
+                    password=_resolve_variables(self.auth.password),
+                )
+
+        resolved_body = self.body
+        if self.body_enabled:
+            if self.body_mode == BodyMode.RAW:
+                resolved_body = self.RawBody(
+                    language=self.body.language,
+                    value=_resolve_variables(self.body.value),
+                )
+            elif self.body_mode == BodyMode.FILE:
+                pass
+            elif self.body_mode == BodyMode.FORM_URLENCODED:
+                resolved_body = self.UrlEncodedFormBody(
+                    fields=[
+                        self.UrlEncodedFormBody.Field(
+                            enabled=field.enabled,
+                            key=_resolve_variables(field.key),
+                            value=_resolve_variables(field.value),
+                        )
+                        for field in self.body.fields
+                    ]
+                )
+            elif self.body_mode == BodyMode.FORM_MULTIPART:
+                resolved_body = self.MultipartFormBody(
+                    fields=[
+                        self.MultipartFormBody.Field(
+                            value_kind=field.value_kind,
+                            enabled=field.enabled,
+                            key=_resolve_variables(field.key),
+                            value=_resolve_variables(field.value),
+                        )
+                        for field in self.body.fields
+                    ]
+                )
+
+        return self.model_copy(
+            update=dict(
+                url=resolved_url,
+                headers=resolved_headers,
+                params=resolved_params,
+                body=resolved_body,
+                auth=resolved_auth,
+            )
+        )
+
     def to_httpx_req(self) -> httpx.Request:
         headers: dict[str, str] = {
             header.key: header.value
@@ -260,7 +363,7 @@ class Request(BaseModel):
         body_files = None
         if self.body_enabled:
             if self.body_mode == BodyMode.RAW:
-                body_raw = self.body
+                body_raw = self.body.value
             elif self.body_mode == BodyMode.FORM_URLENCODED:
                 body_form_urlencoded = {
                     form_field.key: form_field.value
@@ -315,6 +418,21 @@ class Settings(BaseModel):
     id: int | None = None
 
     theme: CustomThemes = CustomThemes.DARK
+
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class Environment(BaseModel):
+    class Variable(BaseModel):
+        enabled: bool
+        key: str
+        value: str
+
+    id: int | None = None
+
+    name: str
+    variables: list[Variable] = _Field(default_factory=list)
 
     created_at: datetime | None = None
     updated_at: datetime | None = None

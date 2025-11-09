@@ -15,6 +15,7 @@ def run_app() -> None:
     from restiny.consts import CONF_DIR, DB_FILE
     from restiny.data.db import DBManager
     from restiny.data.repos import (
+        EnvironmentsSQLRepo,
         FoldersSQLRepo,
         RequestsSQLRepo,
         SettingsSQLRepo,
@@ -29,6 +30,7 @@ def run_app() -> None:
         folders_repo=FoldersSQLRepo(db_manager=db_manager),
         requests_repo=RequestsSQLRepo(db_manager=db_manager),
         settings_repo=SettingsSQLRepo(db_manager=db_manager),
+        environments_repo=EnvironmentsSQLRepo(db_manager=db_manager),
     ).run()
 
 

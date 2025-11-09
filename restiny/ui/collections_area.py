@@ -170,8 +170,7 @@ class _BaseEditScreen(ModalScreen):
 
 
 class _AddScreen(_BaseEditScreen):
-    if TYPE_CHECKING:
-        app: RESTinyApp
+    app: 'RESTinyApp'
 
     @on(Button.Pressed, '#confirm')
     def _on_confirm(self, message: Button.Pressed) -> None:
@@ -220,8 +219,7 @@ class _AddScreen(_BaseEditScreen):
 
 
 class _UpdateScreen(_BaseEditScreen):
-    if TYPE_CHECKING:
-        app: RESTinyApp
+    app: 'RESTinyApp'
 
     def __init__(self, id: int, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -284,8 +282,7 @@ class _UpdateScreen(_BaseEditScreen):
 
 
 class CollectionsArea(Widget):
-    if TYPE_CHECKING:
-        app: RESTinyApp
+    app: 'RESTinyApp'
 
     ALLOW_MAXIMIZE = True
     focusable = True

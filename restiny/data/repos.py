@@ -8,12 +8,17 @@ from enum import StrEnum
 from functools import wraps
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.exc import IntegrityError, InterfaceError, OperationalError
 
 from restiny.data.db import DBManager
-from restiny.data.models import SQLFolder, SQLRequest, SQLSettings
-from restiny.entities import Folder, Request, Settings
+from restiny.data.models import (
+    SQLEnvironment,
+    SQLFolder,
+    SQLRequest,
+    SQLSettings,
+)
+from restiny.entities import Environment, Folder, Request, Settings
 
 
 def safe_repo(func):
@@ -348,4 +353,103 @@ class SettingsSQLRepo(SQLRepoBase):
             theme=settings.theme,
             created_at=settings.created_at,
             updated_at=settings.updated_at,
+        )
+
+
+class EnvironmentsSQLRepo(SQLRepoBase):
+    @safe_repo
+    def get_by_id(self, id: int) -> RepoResp:
+        with self.db_manager.session_scope() as session:
+            sql_environment = session.get(SQLEnvironment, id)
+
+            if not sql_environment:
+                return RepoResp(status=RepoStatus.NOT_FOUND)
+
+            environment = self._sql_to_environment(sql_environment)
+            return RepoResp(data=environment)
+
+    @safe_repo
+    def get_by_name(self, name: str) -> RepoResp:
+        with self.db_manager.session_scope() as session:
+            sql_environment = session.scalar(
+                select(SQLEnvironment).where(SQLEnvironment.name == name)
+            )
+
+            if not sql_environment:
+                return RepoResp(status=RepoStatus.NOT_FOUND)
+
+            environment = self._sql_to_environment(sql_environment)
+            return RepoResp(data=environment)
+
+    @safe_repo
+    def list(self) -> RepoResp:
+        with self.db_manager.session_scope() as session:
+            sql_envs = session.scalars(
+                select(SQLEnvironment).order_by(
+                    case((SQLEnvironment.name == 'global', 0), else_=1),
+                    SQLEnvironment.name.asc(),
+                )
+            )
+            envs = [self._sql_to_environment(sql_env) for sql_env in sql_envs]
+            return RepoResp(data=envs)
+
+    @safe_repo
+    def create(self, environment: Environment) -> RepoResp:
+        with self.db_manager.session_scope() as session:
+            sql_env = self._environment_to_sql(environment)
+            session.add(sql_env)
+            session.flush()
+            new_env = self._sql_to_environment(sql_env)
+            return RepoResp(data=new_env)
+
+    @safe_repo
+    def update(self, environment: Environment) -> RepoResp:
+        with self.db_manager.session_scope() as session:
+            sql_environment = session.get(SQLEnvironment, environment.id)
+            if not sql_environment:
+                return RepoResp(status=RepoStatus.NOT_FOUND)
+
+            new_data = self._environment_to_sql(environment)
+            for field in self._updatable_sql_fields:
+                setattr(sql_environment, field, getattr(new_data, field))
+
+            session.flush()
+
+            new_environment = self._sql_to_environment(sql_environment)
+            return RepoResp(data=new_environment)
+
+    @safe_repo
+    def delete_by_id(self, id: int) -> RepoResp:
+        with self.db_manager.session_scope() as session:
+            sql_environment = session.get(SQLEnvironment, id)
+            if not sql_environment:
+                return RepoResp(status=RepoStatus.NOT_FOUND)
+
+            session.delete(sql_environment)
+            return RepoResp()
+
+    @property
+    def _updatable_sql_fields(self) -> list[str]:
+        return [SQLEnvironment.name.key, SQLEnvironment.variables.key]
+
+    def _sql_to_environment(
+        self, sql_environment: SQLEnvironment
+    ) -> Environment:
+        return Environment(
+            id=sql_environment.id,
+            name=sql_environment.name,
+            variables=json.loads(sql_environment.variables),
+            created_at=sql_environment.created_at.replace(tzinfo=UTC),
+            updated_at=sql_environment.updated_at.replace(tzinfo=UTC),
+        )
+
+    def _environment_to_sql(self, environment: Environment) -> SQLEnvironment:
+        return SQLEnvironment(
+            id=environment.id,
+            name=environment.name,
+            variables=json.dumps(
+                [variable.model_dump() for variable in environment.variables]
+            ),
+            created_at=environment.created_at,
+            updated_at=environment.updated_at,
         )
