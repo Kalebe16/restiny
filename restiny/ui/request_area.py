@@ -514,7 +514,7 @@ class RequestArea(Static):
 
     @option_timeout.setter
     def option_timeout(self, value: float | None) -> None:
-        self.options_timeout_input.value = value
+        self.options_timeout_input.value = '' if value is None else str(value)
 
     @property
     def option_follow_redirects(self) -> bool:
@@ -531,6 +531,33 @@ class RequestArea(Static):
     @option_verify_ssl.setter
     def option_verify_ssl(self, value: bool) -> None:
         self.options_verify_ssl_switch.value = value
+
+    def clear(self) -> None:
+        self.headers = []
+        self.params = []
+
+        self.auth_enabled = False
+        self.auth_mode = AuthMode.BASIC
+        self.auth_basic_username = ''
+        self.auth_basic_password = ''
+        self.auth_bearer_token = ''
+        self.auth_api_key_key = ''
+        self.auth_api_key_value = ''
+        self.auth_api_key_where = 'header'
+        self.auth_digest_username = ''
+        self.auth_digest_password = ''
+
+        self.body_enabled = False
+        self.body_mode = BodyMode.RAW
+        self.body_raw_language = BodyRawLanguage.PLAIN
+        self.body_raw = ''
+        self.body_file = None
+        self.body_form_urlencoded = []
+        self.body_form_multipart = []
+
+        self.option_timeout = None
+        self.option_follow_redirects = False
+        self.option_verify_ssl = False
 
     @on(Select.Changed, '#auth-mode')
     def _on_change_auth_mode(self, message: Select.Changed) -> None:

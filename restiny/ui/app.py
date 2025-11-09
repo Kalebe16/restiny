@@ -104,9 +104,10 @@ class RESTinyApp(App, inherit_bindings=False):
         self.environments_repo = environments_repo
 
         self.active_request_task: asyncio.Task | None = None
-        self.selected_request: Request | None = None
         self.last_focused_widget: Widget | None = None
         self.last_focused_maximizable_area: Widget | None = None
+
+        self._selected_request: Request | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -128,8 +129,7 @@ class RESTinyApp(App, inherit_bindings=False):
         self.request_area = self.query_one(RequestArea)
         self.response_area = self.query_one(ResponseArea)
 
-        self.url_area.disabled = True
-        self.request_area.disabled = True
+        self.selected_request = None
 
         self._register_themes()
         self._apply_settings()
@@ -163,12 +163,24 @@ class RESTinyApp(App, inherit_bindings=False):
         self.collections_area.prompt_add()
 
     def action_prompt_update(self) -> None:
+        if not self.selected_request:
+            self.notify('No request selected', severity='warning')
+            return
+
         self.collections_area.prompt_update()
 
     def action_prompt_delete(self) -> None:
+        if not self.selected_request:
+            self.notify('No request selected', severity='warning')
+            return
+
         self.collections_area.prompt_delete()
 
     def action_save(self) -> None:
+        if not self.selected_request:
+            self.notify('No request selected', severity='warning')
+            return
+
         req = self.get_request()
         self.requests_repo.update(request=req)
         self.collections_area._populate_children(
@@ -258,13 +270,25 @@ class RESTinyApp(App, inherit_bindings=False):
     def _on_request_selected(
         self, message: CollectionsArea.RequestSelected
     ) -> None:
-        self.url_area.disabled = False
-        self.request_area.disabled = False
         req = self.requests_repo.get_by_id(id=message.request_id).data
         self.selected_request = req
         self.set_request(request=req)
-        self.response_area.set_data(None)
+
+        self.response_area.clear()
         self.response_area.is_showing_response = False
+
+    @on(CollectionsArea.RequestUpdated)
+    def _on_request_updated(self, message) -> None:
+        req = self.requests_repo.get_by_id(id=message.request_id).data
+        self.selected_request = req
+
+    @on(CollectionsArea.RequestDeleted)
+    def _on_request_deleted(self, message) -> None:
+        self.selected_request = None
+
+    @on(CollectionsArea.FolderSelected)
+    def _on_folder_selected(self, message) -> None:
+        self.selected_request = None
 
     def _apply_settings(self) -> None:
         settings = self.settings_repo.get().data
@@ -292,6 +316,27 @@ class RESTinyApp(App, inherit_bindings=False):
             ):
                 return widget
             widget = widget.parent
+
+    @property
+    def selected_request(self) -> Request | None:
+        return self._selected_request
+
+    @selected_request.setter
+    def selected_request(self, request: Request | None) -> None:
+        if request is None:
+            self.url_area.clear()
+            self.request_area.clear()
+            self.response_area.clear()
+            self.url_area.disabled = True
+            self.request_area.disabled = True
+            self.response_area.disabled = True
+            self.response_area.is_showing_response = False
+        else:
+            self.url_area.disabled = False
+            self.request_area.disabled = False
+            self.response_area.disabled = False
+
+        self._selected_request = request
 
     def get_request(self) -> Request:
         method = self.url_area.method
@@ -478,7 +523,7 @@ class RESTinyApp(App, inherit_bindings=False):
         self.request_area.option_timeout = str(request.options.timeout)
 
     async def _send_request(self) -> None:
-        self.response_area.set_data(data=None)
+        self.response_area.clear()
         self.response_area.loading = True
         self.url_area.request_pending = True
         try:
@@ -501,10 +546,10 @@ class RESTinyApp(App, inherit_bindings=False):
                 self.notify(f'{error_name}: {error_message}', severity='error')
             else:
                 self.notify(f'{error_name}', severity='error')
-            self.response_area.set_data(data=None)
+            self.response_area.clear()
             self.response_area.is_showing_response = False
         except asyncio.CancelledError:
-            self.response_area.set_data(data=None)
+            self.response_area.clear()
             self.response_area.is_showing_response = False
         finally:
             self.response_area.loading = False

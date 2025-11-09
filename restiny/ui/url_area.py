@@ -110,6 +110,10 @@ class URLArea(Static):
     def url(self, value: str) -> None:
         self.url_input.value = value
 
+    def clear(self) -> None:
+        self.method = HTTPMethod.GET
+        self.url = ''
+
     @on(Button.Pressed, '#send-request')
     @on(CustomInput.Submitted, '#url')
     def _on_send_request(

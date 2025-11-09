@@ -92,12 +92,15 @@ class ResponseArea(Static):
 
         self.headers_data_table.add_columns('Key', 'Value')
 
-    def set_data(self, data: ResponseAreaData | None) -> None:
+    def clear(self) -> None:
         self.border_title = self.BORDER_TITLE
         self.border_subtitle = ''
         self.headers_data_table.clear()
         self.body_raw_language_select.value = BodyRawLanguage.PLAIN
         self.body_raw_editor.clear()
+
+    def set_data(self, data: ResponseAreaData | None) -> None:
+        self.clear()
 
         if data is None:
             return
