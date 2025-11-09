@@ -1,34 +1,42 @@
 import asyncio
+from collections.abc import Iterable
 from http import HTTPStatus
 
 import httpx
 import pyperclip
 from textual import on
-from textual.app import App, ComposeResult
+from textual.app import App, ComposeResult, SystemCommand
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.events import DescendantFocus
+from textual.screen import Screen
 from textual.widget import Widget
 from textual.widgets import Footer, Header
 
 from restiny.__about__ import __version__
 from restiny.assets import STYLE_TCSS
 from restiny.consts import CUSTOM_THEMES
-from restiny.data.repos import FoldersSQLRepo, RequestsSQLRepo, SettingsSQLRepo
+from restiny.data.repos import (
+    EnvironmentsSQLRepo,
+    FoldersSQLRepo,
+    RequestsSQLRepo,
+    SettingsSQLRepo,
+)
 from restiny.entities import Request, Settings
 from restiny.enums import (
     AuthMode,
     BodyMode,
     BodyRawLanguage,
     ContentType,
-    CustomThemes,
 )
 from restiny.ui import (
     CollectionsArea,
     RequestArea,
     ResponseArea,
+    TopBarArea,
     URLArea,
 )
+from restiny.ui.environments_screen import EnvironmentsScreen
 from restiny.ui.response_area import ResponseAreaData
 from restiny.ui.settings_screen import SettingsScreen
 from restiny.widgets.custom_text_area import CustomTextArea
@@ -37,17 +45,10 @@ from restiny.widgets.custom_text_area import CustomTextArea
 class RESTinyApp(App, inherit_bindings=False):
     TITLE = f'RESTiny v{__version__}'
     SUB_TITLE = 'Minimal HTTP client, no bullshit'
-    ENABLE_COMMAND_PALETTE = False
     CSS_PATH = STYLE_TCSS
     BINDINGS = [
         Binding(
             key='escape', action='quit', description='Quit the app', show=True
-        ),
-        Binding(
-            key='ctrl+b',
-            action='toggle_collections',
-            description='Toggle collections',
-            show=True,
         ),
         Binding(
             key='ctrl+n',
@@ -70,13 +71,13 @@ class RESTinyApp(App, inherit_bindings=False):
         Binding(
             key='ctrl+s',
             action='save',
-            description='Save request',
+            description='Save req',
             show=True,
         ),
         Binding(
-            key='f9',
-            action='copy_as_curl',
-            description='Copy as curl',
+            key='ctrl+b',
+            action='toggle_collections',
+            description='Toggle collections',
             show=True,
         ),
         Binding(
@@ -85,20 +86,14 @@ class RESTinyApp(App, inherit_bindings=False):
             description='Maximize/Minimize area',
             show=True,
         ),
-        Binding(
-            key='f12',
-            action='open_settings',
-            description='Settings',
-            show=True,
-        ),
     ]
-    # theme = 'textual-dark'
 
     def __init__(
         self,
         folders_repo: FoldersSQLRepo,
         requests_repo: RequestsSQLRepo,
         settings_repo: SettingsSQLRepo,
+        environments_repo: EnvironmentsSQLRepo,
         *args,
         **kwargs,
     ) -> None:
@@ -106,6 +101,7 @@ class RESTinyApp(App, inherit_bindings=False):
         self.folders_repo = folders_repo
         self.requests_repo = requests_repo
         self.settings_repo = settings_repo
+        self.environments_repo = environments_repo
 
         self.active_request_task: asyncio.Task | None = None
         self.selected_request: Request | None = None
@@ -117,7 +113,8 @@ class RESTinyApp(App, inherit_bindings=False):
         with Horizontal():
             yield CollectionsArea(classes='w-1fr')
             with Vertical(classes='w-6fr'):
-                with Horizontal(classes='h-auto'):
+                with Vertical(classes='h-auto'):
+                    yield TopBarArea()
                     yield URLArea()
                 with Horizontal(classes='h-1fr'):
                     yield RequestArea()
@@ -126,6 +123,7 @@ class RESTinyApp(App, inherit_bindings=False):
 
     def on_mount(self) -> None:
         self.collections_area = self.query_one(CollectionsArea)
+        self.top_bar_area = self.query_one(TopBarArea)
         self.url_area = self.query_one(URLArea)
         self.request_area = self.query_one(RequestArea)
         self.response_area = self.query_one(ResponseArea)
@@ -135,6 +133,25 @@ class RESTinyApp(App, inherit_bindings=False):
 
         self._register_themes()
         self._apply_settings()
+
+    def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
+        yield SystemCommand('Copy as cURL', None, self.action_copy_as_curl)
+        yield SystemCommand(
+            'Show/Hide keys and help panel',
+            None,
+            self.action_toggle_help_panel,
+        )
+        yield SystemCommand(
+            'Save screenshot',
+            None,
+            lambda: self.set_timer(0.1, self.deliver_screenshot),
+        )
+        yield SystemCommand(
+            'Manage environments', None, self.action_manage_envs
+        )
+        yield SystemCommand(
+            'Manage settings', None, self.action_manage_settings
+        )
 
     def action_toggle_collections(self) -> None:
         if self.collections_area.display:
@@ -169,22 +186,28 @@ class RESTinyApp(App, inherit_bindings=False):
         else:
             self.screen.maximize(self.last_focused_maximizable_area)
 
+    def action_toggle_help_panel(self) -> None:
+        if self.query('HelpPanel'):
+            self.action_hide_help_panel()
+        else:
+            self.action_show_help_panel()
+
     def action_copy_as_curl(self) -> None:
         if not self.selected_request:
             self.notify(
-                'Select a request before copying as CURL.',
+                'No request selected',
                 severity='warning',
             )
             return
 
-        request = self.get_request()
+        request = self.get_resolved_request()
         self.copy_to_clipboard(request.to_curl())
         self.notify(
-            'Command CURL copied to clipboard',
+            'CURL command copied to clipboard',
             severity='information',
         )
 
-    def action_open_settings(self) -> None:
+    def action_manage_settings(self) -> None:
         def on_settings_result(result: dict | None) -> None:
             if not result:
                 return
@@ -192,13 +215,17 @@ class RESTinyApp(App, inherit_bindings=False):
             self.settings_repo.set(Settings(theme=result['theme']))
             self._apply_settings()
 
-        settings: Settings = self.settings_repo.get().data
         self.push_screen(
-            screen=SettingsScreen(
-                themes=[theme.value for theme in CustomThemes],
-                theme=settings.theme,
-            ),
+            screen=SettingsScreen(),
             callback=on_settings_result,
+        )
+
+    def action_manage_envs(self) -> None:
+        def on_manage_environments_result(result) -> None:
+            self.top_bar_area.populate()
+
+        self.push_screen(
+            screen=EnvironmentsScreen(), callback=on_manage_environments_result
         )
 
     def copy_to_clipboard(self, text: str) -> None:
@@ -369,6 +396,20 @@ class RESTinyApp(App, inherit_bindings=False):
             options=options,
         )
 
+    def get_resolved_request(self) -> Request:
+        global_environment = self.environments_repo.get_by_name(
+            name='global'
+        ).data
+        request = self.get_request().resolve_variables(
+            global_environment.variables
+        )
+        if self.top_bar_area.environment:
+            environment = self.environments_repo.get_by_name(
+                name=self.top_bar_area.environment
+            ).data
+            request = request.resolve_variables(environment.variables)
+        return request
+
     def set_request(self, request: Request) -> None:
         self.url_area.method = request.method
         self.url_area.url = request.url
@@ -441,7 +482,7 @@ class RESTinyApp(App, inherit_bindings=False):
         self.response_area.loading = True
         self.url_area.request_pending = True
         try:
-            request = self.get_request()
+            request = self.get_resolved_request()
             async with httpx.AsyncClient(
                 timeout=request.options.timeout,
                 follow_redirects=request.options.follow_redirects,
