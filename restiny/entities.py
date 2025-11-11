@@ -125,7 +125,7 @@ class Request(BaseModel):
     updated_at: datetime | None = None
 
     def resolve_variables(
-        self, variables: list[Environment.Variable]
+        self, variables: list['Environment.Variable']
     ) -> 'Request':
         def _resolve_variables(value: str) -> str:
             new_value = value
