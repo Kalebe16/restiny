@@ -60,7 +60,7 @@ class CollectionsTree(Tree):
         }
         node = parent_node.add_leaf(
             label=f'[{method_to_color[method]}]{method}[/] {name}'
-        )  # noqa
+        )
         node.data = {
             'method': method,
             'name': name,
@@ -68,3 +68,7 @@ class CollectionsTree(Tree):
         }
         self.node_by_id[id] = node
         return node
+
+    def remove(self, node: TreeNode) -> None:
+        del self.node_by_id[node.data['id']]
+        node.remove()

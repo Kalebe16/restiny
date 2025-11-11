@@ -16,6 +16,7 @@ from textual.widgets import (
     Select,
     Static,
 )
+from textual.widgets.tree import TreeNode
 
 from restiny.entities import Folder, Request
 from restiny.enums import HTTPMethod
@@ -475,6 +476,15 @@ class CollectionsArea(Widget):
         if not result.confirmed:
             return
 
+        try:
+            prev_selected_index_in_parent = (
+                self.collections_tree.cursor_node.parent.children.index(
+                    self.collections_tree.cursor_node
+                )
+            )
+        except ValueError:
+            prev_selected_index_in_parent = 0
+
         if self.collections_tree.cursor_node.allow_expand:
             self.app.folders_repo.delete_by_id(
                 self.collections_tree.cursor_node.data['id']
@@ -504,11 +514,24 @@ class CollectionsArea(Widget):
                 )
             )
 
-    def _populate_children(self, node) -> None:
-        folder_id = node.data['id']
+        if self.collections_tree.cursor_node.parent.children:
+            next_index_to_select = min(
+                prev_selected_index_in_parent,
+                len(self.collections_tree.cursor_node.parent.children) - 1,
+            )
+            next_node_to_select = (
+                self.collections_tree.cursor_node.parent.children[
+                    next_index_to_select
+                ]
+            )
+        else:
+            next_node_to_select = self.collections_tree.cursor_node.parent
+        self.call_after_refresh(
+            lambda: self.collections_tree.select_node(next_node_to_select)
+        )
 
-        for child in list(node.children):
-            child.remove()
+    def _populate_children(self, node: TreeNode) -> None:
+        folder_id = node.data['id']
 
         folders = self.app.folders_repo.list_by_parent_id(folder_id).data
         requests = self.app.requests_repo.list_by_folder_id(folder_id).data
@@ -525,6 +548,9 @@ class CollectionsArea(Widget):
         )
         sorted_requests = sorted(requests, key=sort_requests)
 
+        for child_node in list(node.children):
+            self.collections_tree.remove(child_node)
+
         for folder in sorted_folders:
             self.collections_tree.add_folder(
                 parent_node=node, name=folder.name, id=folder.id
@@ -537,6 +563,8 @@ class CollectionsArea(Widget):
                 name=request.name,
                 id=request.id,
             )
+
+        node.refresh()
 
     def _resolve_all_folder_paths(self) -> list[dict[str, str | int | None]]:
         paths: list[dict[str, str | int | None]] = [{'path': '/', 'id': None}]
