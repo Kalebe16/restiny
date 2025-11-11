@@ -163,17 +163,9 @@ class RESTinyApp(App, inherit_bindings=False):
         self.collections_area.prompt_add()
 
     def action_prompt_update(self) -> None:
-        if not self.selected_request:
-            self.notify('No request selected', severity='warning')
-            return
-
         self.collections_area.prompt_update()
 
     def action_prompt_delete(self) -> None:
-        if not self.selected_request:
-            self.notify('No request selected', severity='warning')
-            return
-
         self.collections_area.prompt_delete()
 
     def action_save(self) -> None:
