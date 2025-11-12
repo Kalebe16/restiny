@@ -533,8 +533,8 @@ class CollectionsArea(Widget):
     def _populate_children(self, node: TreeNode) -> None:
         folder_id = node.data['id']
 
-        folders = self.app.folders_repo.list_by_parent_id(folder_id).data
-        requests = self.app.requests_repo.list_by_folder_id(folder_id).data
+        folders = self.app.folders_repo.get_by_parent_id(folder_id).data
+        requests = self.app.requests_repo.get_by_folder_id(folder_id).data
 
         def sort_requests(request: Request) -> tuple:
             methods = [method.value for method in HTTPMethod]
@@ -574,9 +574,9 @@ class CollectionsArea(Widget):
             parent_path, parent_id = paths_stack.pop(0)
 
             if parent_id is None:
-                children = self.app.folders_repo.list_roots().data
+                children = self.app.folders_repo.get_roots().data
             else:
-                children = self.app.folders_repo.list_by_parent_id(
+                children = self.app.folders_repo.get_by_parent_id(
                     parent_id
                 ).data
 

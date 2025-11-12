@@ -255,7 +255,7 @@ class EnvironmentsScreen(ModalScreen):
         self.dismiss(result=None)
 
     async def _populate_environments(self) -> None:
-        environments = self.app.environments_repo.list().data
+        environments = self.app.environments_repo.get_all().data
         for environment in environments:
             await self._add_environment(
                 name=environment.name, id=environment.id
