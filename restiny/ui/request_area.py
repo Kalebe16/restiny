@@ -97,6 +97,7 @@ class RequestArea(Static):
                         )
                         yield CustomInput(
                             placeholder='Key',
+                            select_on_focus=False,
                             classes='w-2fr',
                             id='auth-api-key-key',
                         )

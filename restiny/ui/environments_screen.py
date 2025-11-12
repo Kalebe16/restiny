@@ -60,6 +60,7 @@ class EnvironmentsScreen(ModalScreen):
                     with Horizontal(classes='w-auto h-auto mt-1'):
                         yield CustomInput(
                             placeholder='Environment name',
+                            select_on_focus=False,
                             classes='w-4fr',
                             id='environment-name',
                         )
@@ -76,6 +77,7 @@ class EnvironmentsScreen(ModalScreen):
                     with Horizontal(classes='w-auto h-auto'):
                         yield CustomInput(
                             placeholder='Environment name',
+                            select_on_focus=False,
                             classes='w-5fr',
                             id='environment-rename',
                         )

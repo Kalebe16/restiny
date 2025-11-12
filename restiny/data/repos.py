@@ -94,6 +94,22 @@ class FoldersSQLRepo(SQLRepoBase):
             return RepoResp(data=folders)
 
     @safe_repo
+    def get_by_parent_id_and_name(
+        self, parent_id: int, name: str
+    ) -> RepoResp[Folder | None]:
+        with self.db_manager.session_scope() as session:
+            sql_folder = session.scalar(
+                select(SQLFolder).where(
+                    SQLFolder.parent_id == parent_id, SQLFolder.name == name
+                )
+            )
+            if not sql_folder:
+                return RepoResp(status=RepoStatus.NOT_FOUND)
+
+            folder = self._sql_to_folder(sql_folder)
+            return RepoResp(data=folder)
+
+    @safe_repo
     def get_roots(self) -> RepoResp[list[Folder]]:
         with self.db_manager.session_scope() as session:
             sql_folders = session.scalars(

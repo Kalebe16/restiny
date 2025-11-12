@@ -4,4 +4,5 @@ httpx>=0.28, <0.29
 pyperclip>=1.9, <1.10
 sqlalchemy>=2.0, <3.0
 pydantic>=2.12, <2.13
+prance[osv,icu]>=25.4.8.0,<25.5.0.0
 

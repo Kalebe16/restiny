@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import Iterable
 from http import HTTPStatus
+from pathlib import Path
 
 import httpx
 import pyperclip
@@ -22,12 +23,13 @@ from restiny.data.repos import (
     RequestsSQLRepo,
     SettingsSQLRepo,
 )
-from restiny.entities import Request, Settings
+from restiny.entities import Folder, Request, Settings
 from restiny.enums import (
     AuthMode,
     BodyMode,
     BodyRawLanguage,
     ContentType,
+    HTTPMethod,
 )
 from restiny.ui import (
     CollectionsArea,
@@ -37,6 +39,7 @@ from restiny.ui import (
     URLArea,
 )
 from restiny.ui.environments_screen import EnvironmentsScreen
+from restiny.ui.import_open_api_screen import ImportOpenAPIScreen
 from restiny.ui.settings_screen import SettingsScreen
 from restiny.widgets.custom_text_area import CustomTextArea
 
@@ -151,6 +154,9 @@ class RESTinyApp(App, inherit_bindings=False):
         yield SystemCommand(
             'Manage settings', None, self.action_manage_settings
         )
+        yield SystemCommand(
+            'Import from openapi', None, self.action_import_from_open_api
+        )
 
     def action_toggle_collections(self) -> None:
         if self.collections_area.display:
@@ -221,6 +227,76 @@ class RESTinyApp(App, inherit_bindings=False):
         self.push_screen(
             screen=SettingsScreen(),
             callback=on_settings_result,
+        )
+
+    def action_import_from_open_api(self) -> None:
+
+        from prance import ResolvingParser as OpenAPIParser
+
+        def on_import_open_api_result(result: dict) -> None:
+            file: Path = result['file']
+            collection_name = result['collection_name']
+
+            try:
+                parser = OpenAPIParser(str(file))
+            except:
+                self.notify(
+                    'Failed to import from openapi spec', severity='error'
+                )
+                return
+
+            create_resp = self.folders_repo.create(
+                Folder(parent_id=None, name=collection_name)
+            )
+            if not create_resp.ok:
+                self.notify(
+                    'Failed to import from openapi spec', severity='error'
+                )
+                return
+            collection = create_resp.data
+
+            base_url = (
+                (parser.specification['schemes'] or ['http'])[0]
+                + parser.specification['host']
+                + parser.specification['basePath']
+            )
+
+            for path, methods in parser.specification['paths'].items():
+                for method, operation in methods.items():
+                    folder_name = operation['tags'][0]
+
+                    folder_resp = self.folders_repo.get_by_parent_id_and_name(
+                        parent_id=collection.id, name=folder_name
+                    )
+                    if not folder_resp.ok:
+                        folder = self.folders_repo.create(
+                            Folder(parent_id=collection.id, name=folder_name)
+                        ).data
+                    else:
+                        folder = folder_resp.data
+
+                    request_name = (
+                        operation.get('operationId')
+                        or operation.get('summary')
+                        or path
+                    )
+
+                    url = parser.specification['paths']
+                    request = self.requests_repo.create(
+                        Request(
+                            folder_id=folder.id,
+                            name=request_name,
+                            method=HTTPMethod(method.upper()),
+                            url=path.replace('{', '{{').replace('}', '}}'),
+                        )
+                    )
+
+            self.collections_area._populate_children(
+                self.collections_area.collections_tree.root
+            )
+
+        self.push_screen(
+            ImportOpenAPIScreen(), callback=on_import_open_api_result
         )
 
     def action_manage_envs(self) -> None:

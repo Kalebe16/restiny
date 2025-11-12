@@ -83,6 +83,7 @@ def filter_paths(
     paths: Iterable[Path],
     show_hidden_dirs: bool = False,
     show_hidden_files: bool = False,
+    allowed_file_suffixes: list[str] | None = None,
 ) -> list[Path]:
     """
     Filters a list of paths, hiding or showing hidden directories and files.
@@ -90,11 +91,16 @@ def filter_paths(
     filtered_paths = []
     for path in paths:
         if path.is_dir():
-            if not show_hidden_dirs and str(path.name).startswith('.'):
+            if not show_hidden_dirs and path.name.startswith('.'):
                 continue
             filtered_paths.append(path)
         elif path.is_file():
-            if not show_hidden_files and str(path.name).startswith('.'):
+            if not show_hidden_files and path.name.startswith('.'):
+                continue
+            if (
+                allowed_file_suffixes is not None
+                and path.suffix not in allowed_file_suffixes
+            ):
                 continue
             filtered_paths.append(path)
     return filtered_paths
