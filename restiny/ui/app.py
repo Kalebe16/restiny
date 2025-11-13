@@ -37,7 +37,6 @@ from restiny.ui import (
     URLArea,
 )
 from restiny.ui.environments_screen import EnvironmentsScreen
-from restiny.ui.response_area import ResponseAreaData
 from restiny.ui.settings_screen import SettingsScreen
 from restiny.widgets.custom_text_area import CustomTextArea
 
@@ -548,13 +547,6 @@ class RESTinyApp(App, inherit_bindings=False):
             self.url_area.request_pending = False
 
     def _display_response(self, response: httpx.Response) -> None:
-        status = HTTPStatus(response.status_code)
-        size = response.num_bytes_downloaded
-        elapsed_time = round(response.elapsed.total_seconds(), 2)
-        headers = {
-            header_key: header_value
-            for header_key, header_value in response.headers.multi_items()
-        }
         content_type_to_body_language = {
             ContentType.TEXT: BodyRawLanguage.PLAIN,
             ContentType.HTML: BodyRawLanguage.HTML,
@@ -562,17 +554,19 @@ class RESTinyApp(App, inherit_bindings=False):
             ContentType.YAML: BodyRawLanguage.YAML,
             ContentType.XML: BodyRawLanguage.XML,
         }
-        body_raw_language = content_type_to_body_language.get(
-            response.headers.get('Content-Type'), BodyRawLanguage.PLAIN
+
+        self.response_area.status = HTTPStatus(response.status_code)
+        self.response_area.content_size = response.num_bytes_downloaded
+        self.response_area.elapsed_time = round(
+            response.elapsed.total_seconds(), 2
         )
-        body_raw = response.text
-        self.response_area.set_data(
-            data=ResponseAreaData(
-                status=status,
-                size=size,
-                elapsed_time=elapsed_time,
-                headers=headers,
-                body_raw_language=body_raw_language,
-                body_raw=body_raw,
+        self.response_area.headers = {
+            header_key: header_value
+            for header_key, header_value in response.headers.multi_items()
+        }
+        self.response_area.body_raw_language = (
+            content_type_to_body_language.get(
+                response.headers.get('Content-Type'), BodyRawLanguage.PLAIN
             )
         )
+        self.response_area.body_raw = response.text

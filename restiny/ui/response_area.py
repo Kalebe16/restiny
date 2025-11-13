@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+import re
 from http import HTTPStatus
 
 from textual import on
@@ -16,16 +16,6 @@ from textual.widgets import (
 
 from restiny.enums import BodyRawLanguage
 from restiny.widgets import CustomTextArea
-
-
-@dataclass
-class ResponseAreaData:
-    status: HTTPStatus
-    size: int
-    elapsed_time: float | int
-    headers: dict
-    body_raw_language: BodyRawLanguage
-    body_raw: str
 
 
 # TODO: Implement 'Trace' tab pane
@@ -48,8 +38,14 @@ class ResponseArea(Static):
         width: 1fr;
         content-align: center middle;
     }
-
     """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._title_regex = (
+            rf'^{self.BORDER_TITLE}\s+(?P<code>\d{{3}})\((?P<phrase>[^)]+)\)$'
+        )
+        self._subtitle_regex = r'^(?P<content_size>\d+)\s+bytes\s+in\s+(?P<elapsed_time>[\d.]+)\s+seconds$'
 
     def compose(self) -> ComposeResult:
         with ContentSwitcher(id='response-switcher', initial='no-content'):
@@ -92,27 +88,82 @@ class ResponseArea(Static):
 
         self.headers_data_table.add_columns('Key', 'Value')
 
-    def clear(self) -> None:
-        self.border_title = self.BORDER_TITLE
-        self.border_subtitle = ''
-        self.headers_data_table.clear()
-        self.body_raw_language_select.value = BodyRawLanguage.PLAIN
-        self.body_raw_editor.clear()
+    @property
+    def status(self) -> HTTPStatus | None:
+        match = re.match(self._title_regex, self.border_title)
+        if match:
+            return HTTPStatus(int(match['code']))
+        return None
 
-    def set_data(self, data: ResponseAreaData | None) -> None:
-        self.clear()
-
-        if data is None:
-            return
-
-        self.border_title = f'Response - {data.status} {data.status.phrase}'
-        self.border_subtitle = (
-            f'{data.size} bytes in {data.elapsed_time} seconds'
+    @status.setter
+    def status(self, value: HTTPStatus) -> None:
+        self.border_title = (
+            f'{self.BORDER_TITLE} {value.value}({value.phrase})'
         )
-        for header_key, header_value in data.headers.items():
+
+    @property
+    def content_size(self) -> int | None:
+        match = re.match(self._subtitle_regex, self.border_subtitle)
+        if match:
+            return int(match['content_size'])
+        return None
+
+    @content_size.setter
+    def content_size(self, value: int) -> None:
+        match = re.match(self._subtitle_regex, self.border_subtitle)
+        if match:
+            elapsed_time = match['elapsed_time']
+        else:
+            elapsed_time = '0'
+
+        self.border_subtitle = f'{value} bytes in {elapsed_time} seconds'
+
+    @property
+    def elapsed_time(self) -> float | None:
+        match = re.match(self._subtitle_regex, self.border_subtitle)
+        if match:
+            return float(match['elapsed_time'])
+        return None
+
+    @elapsed_time.setter
+    def elapsed_time(self, value: float) -> None:
+        match = re.match(self._subtitle_regex, self.border_subtitle)
+        if match:
+            content_size = match['content_size']
+        else:
+            content_size = '0'
+
+        self.border_subtitle = f'{content_size} bytes in {value} seconds'
+
+    @property
+    def headers(self) -> dict[str, str]:
+        headers = {}
+        for row_key in self.headers_data_table.rows:
+            cells = self.headers_data_table.get_row(row_key)
+            headers[cells[0]] = cells[1]
+        return headers
+
+    @headers.setter
+    def headers(self, value: dict[str, str]) -> None:
+        self.headers_data_table.clear()
+        for header_key, header_value in value.items():
             self.headers_data_table.add_row(header_key, header_value)
-        self.body_raw_language_select.value = data.body_raw_language
-        self.body_raw_editor.text = data.body_raw
+
+    @property
+    def body_raw_language(self) -> BodyRawLanguage:
+        return self.body_raw_language_select.value
+
+    @body_raw_language.setter
+    def body_raw_language(self, value: BodyRawLanguage) -> None:
+        self.body_raw_language_select.value = value
+
+    @property
+    def body_raw(self) -> str:
+        return self.body_raw_editor.text
+
+    @body_raw.setter
+    def body_raw(self, value: str) -> None:
+        self.body_raw_editor.text = value
 
     @property
     def is_showing_response(self) -> bool:
@@ -127,6 +178,13 @@ class ResponseArea(Static):
             self._response_switcher.current = 'content'
         elif value is False:
             self._response_switcher.current = 'no-content'
+
+    def clear(self) -> None:
+        self.border_title = self.BORDER_TITLE
+        self.border_subtitle = ''
+        self.headers_data_table.clear()
+        self.body_raw_language_select.value = BodyRawLanguage.PLAIN
+        self.body_raw_editor.clear()
 
     @on(Select.Changed, '#body-raw-language')
     def _on_body_raw_language_changed(self, message: Select.Changed) -> None:
