@@ -7,6 +7,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, Select
 
+from restiny.entities import Settings
 from restiny.enums import CustomThemes
 
 if TYPE_CHECKING:
@@ -70,4 +71,5 @@ class SettingsScreen(ModalScreen):
 
     @on(Button.Pressed, '#confirm')
     def _on_confirm(self, message: Button.Pressed) -> None:
-        self.dismiss(result={'theme': self.theme_select.value})
+        self.settings_repo.set(Settings(theme=self.theme_select.value))
+        self.dismiss(result=None)

@@ -22,7 +22,7 @@ from restiny.data.repos import (
     RequestsSQLRepo,
     SettingsSQLRepo,
 )
-from restiny.entities import Request, Settings
+from restiny.entities import Request
 from restiny.enums import (
     AuthMode,
     BodyMode,
@@ -36,8 +36,8 @@ from restiny.ui import (
     TopBarArea,
     URLArea,
 )
-from restiny.ui.environments_screen import EnvironmentsScreen
-from restiny.ui.settings_screen import SettingsScreen
+from restiny.ui.screens.environments_screen import EnvironmentsScreen
+from restiny.ui.screens.settings_screen import SettingsScreen
 from restiny.widgets.custom_text_area import CustomTextArea
 
 
@@ -211,11 +211,7 @@ class RESTinyApp(App, inherit_bindings=False):
         )
 
     def action_manage_settings(self) -> None:
-        def on_settings_result(result: dict | None) -> None:
-            if not result:
-                return
-
-            self.settings_repo.set(Settings(theme=result['theme']))
+        def on_settings_result(result) -> None:
             self._apply_settings()
 
         self.push_screen(
