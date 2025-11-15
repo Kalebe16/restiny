@@ -584,19 +584,3 @@ class RequestArea(Static):
     @on(Select.Changed, '#body-raw-language')
     def _on_change_body_raw_language(self, message: Select.Changed) -> None:
         self.body_raw_editor.language = message.value
-
-    @on(DynamicFields.FieldFilled, '#body-form-urlencoded')
-    def _on_form_filled(self, message: DynamicFields.FieldFilled) -> None:
-        self.body_enabled_switch.value = True
-
-    @on(DynamicFields.FieldEmpty, '#body-form-urlencoded')
-    def _on_form_empty(self, message: DynamicFields.FieldEmpty) -> None:
-        if not message.control.filled_fields:
-            self.body_enabled_switch.value = False
-
-    @on(CustomTextArea.Changed, '#body-raw')
-    def _on_change_body_raw(self, message: CustomTextArea.Changed) -> None:
-        if self.body_raw_editor.text == '':
-            self.body_enabled_switch.value = False
-        else:
-            self.body_enabled_switch.value = True

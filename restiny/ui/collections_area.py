@@ -23,7 +23,6 @@ from restiny.ui.screens.request_or_folder_screen import (
 from restiny.widgets import (
     CollectionsTree,
     ConfirmPrompt,
-    ConfirmPromptResult,
 )
 
 if TYPE_CHECKING:
@@ -101,7 +100,7 @@ class CollectionsArea(Widget):
         self.collections_tree = self.query_one(CollectionsTree)
         self.border_title = 'Collections'
 
-        self._populate_children(node=self.collections_tree.root)
+        self.populate_children(node=self.collections_tree.root)
         self._sync_content_switcher()
 
     def prompt_add(self) -> None:
@@ -161,126 +160,7 @@ class CollectionsArea(Widget):
             callback=self._on_prompt_delete_result,
         )
 
-    @on(CollectionsTree.NodeExpanded)
-    def _on_node_expanded(self, message: CollectionsTree.NodeExpanded) -> None:
-        self._populate_children(node=message.node)
-
-    @on(CollectionsTree.NodeSelected)
-    def _on_node_selected(self, message: CollectionsTree.NodeSelected) -> None:
-        if message.node.allow_expand:
-            self.post_message(
-                message=self.FolderSelected(folder_id=message.node.data['id'])
-            )
-        else:
-            self.post_message(
-                message=self.RequestSelected(
-                    request_id=message.node.data['id']
-                )
-            )
-
-    def _on_prompt_add_result(
-        self, result: AddFolderResult | AddRequestResult | None
-    ) -> None:
-        if result is None:
-            return
-
-        if isinstance(result, AddRequestResult):
-            parent_node = self.collections_tree.node_by_id[result.folder_id]
-            self._populate_children(parent_node)
-            self._sync_content_switcher()
-            self.post_message(message=self.RequestAdded(request_id=result.id))
-        elif isinstance(result, AddFolderResult):
-            parent_node = self.collections_tree.node_by_id[result.parent_id]
-            self._populate_children(parent_node)
-            self._sync_content_switcher()
-            self.post_message(message=self.FolderAdded(folder_id=result.id))
-
-    def _on_prompt_update_result(
-        self, result: UpdateFolderResult | UpdateRequestResult | None
-    ) -> None:
-        if result is None:
-            return
-
-        if isinstance(result, UpdateRequestResult):
-            parent_node = self.collections_tree.node_by_id[result.folder_id]
-            old_parent_node = self.collections_tree.node_by_id[
-                result.old_folder_id
-            ]
-            self._populate_children(parent_node)
-            self._populate_children(old_parent_node)
-            self._sync_content_switcher()
-            self.post_message(
-                message=self.RequestUpdated(request_id=result.id)
-            )
-        elif isinstance(result, UpdateFolderResult):
-            parent_node = self.collections_tree.node_by_id[result.parent_id]
-            old_parent_node = self.collections_tree.node_by_id[
-                result.old_parent_id
-            ]
-            self._populate_children(parent_node)
-            self._populate_children(old_parent_node)
-            self._sync_content_switcher()
-            self.post_message(message=self.FolderUpdated(folder_id=result.id))
-
-    def _on_prompt_delete_result(self, result: ConfirmPromptResult) -> None:
-        if not result.confirmed:
-            return
-
-        try:
-            prev_selected_index_in_parent = (
-                self.collections_tree.cursor_node.parent.children.index(
-                    self.collections_tree.cursor_node
-                )
-            )
-        except ValueError:
-            prev_selected_index_in_parent = 0
-
-        if self.collections_tree.cursor_node.allow_expand:
-            self.app.folders_repo.delete_by_id(
-                self.collections_tree.cursor_node.data['id']
-            )
-            self.notify('Folder deleted', severity='information')
-            self._populate_children(
-                node=self.collections_tree.cursor_node.parent
-            )
-            self._sync_content_switcher()
-            self.post_message(
-                message=self.FolderDeleted(
-                    folder_id=self.collections_tree.cursor_node.data['id']
-                )
-            )
-        else:
-            self.app.requests_repo.delete_by_id(
-                self.collections_tree.cursor_node.data['id']
-            )
-            self.notify('Request deleted', severity='information')
-            self._populate_children(
-                node=self.collections_tree.cursor_node.parent
-            )
-            self._sync_content_switcher()
-            self.post_message(
-                message=self.RequestDeleted(
-                    request_id=self.collections_tree.cursor_node.data['id']
-                )
-            )
-
-        if self.collections_tree.cursor_node.parent.children:
-            next_index_to_select = min(
-                prev_selected_index_in_parent,
-                len(self.collections_tree.cursor_node.parent.children) - 1,
-            )
-            next_node_to_select = (
-                self.collections_tree.cursor_node.parent.children[
-                    next_index_to_select
-                ]
-            )
-        else:
-            next_node_to_select = self.collections_tree.cursor_node.parent
-        self.call_after_refresh(
-            lambda: self.collections_tree.select_node(next_node_to_select)
-        )
-
-    def _populate_children(self, node: TreeNode) -> None:
+    def populate_children(self, node: TreeNode) -> None:
         folder_id = node.data['id']
 
         folders = self.app.folders_repo.get_by_parent_id(folder_id).data
@@ -315,6 +195,126 @@ class CollectionsArea(Widget):
             )
 
         node.refresh()
+        self._sync_content_switcher()
+
+    @on(CollectionsTree.NodeExpanded)
+    def _on_node_expanded(self, message: CollectionsTree.NodeExpanded) -> None:
+        self.populate_children(node=message.node)
+
+    @on(CollectionsTree.NodeSelected)
+    def _on_node_selected(self, message: CollectionsTree.NodeSelected) -> None:
+        if message.node.allow_expand:
+            self.post_message(
+                message=self.FolderSelected(folder_id=message.node.data['id'])
+            )
+        else:
+            self.post_message(
+                message=self.RequestSelected(
+                    request_id=message.node.data['id']
+                )
+            )
+
+    def _on_prompt_add_result(
+        self, result: AddFolderResult | AddRequestResult | None
+    ) -> None:
+        if result is None:
+            return
+
+        if isinstance(result, AddRequestResult):
+            parent_node = self.collections_tree.node_by_id[result.folder_id]
+            self.populate_children(parent_node)
+            self._sync_content_switcher()
+            self.post_message(message=self.RequestAdded(request_id=result.id))
+        elif isinstance(result, AddFolderResult):
+            parent_node = self.collections_tree.node_by_id[result.parent_id]
+            self.populate_children(parent_node)
+            self._sync_content_switcher()
+            self.post_message(message=self.FolderAdded(folder_id=result.id))
+
+    def _on_prompt_update_result(
+        self, result: UpdateFolderResult | UpdateRequestResult | None
+    ) -> None:
+        if result is None:
+            return
+
+        if isinstance(result, UpdateRequestResult):
+            parent_node = self.collections_tree.node_by_id[result.folder_id]
+            old_parent_node = self.collections_tree.node_by_id[
+                result.old_folder_id
+            ]
+            self.populate_children(parent_node)
+            self.populate_children(old_parent_node)
+            self._sync_content_switcher()
+            self.post_message(
+                message=self.RequestUpdated(request_id=result.id)
+            )
+        elif isinstance(result, UpdateFolderResult):
+            parent_node = self.collections_tree.node_by_id[result.parent_id]
+            old_parent_node = self.collections_tree.node_by_id[
+                result.old_parent_id
+            ]
+            self.populate_children(parent_node)
+            self.populate_children(old_parent_node)
+            self._sync_content_switcher()
+            self.post_message(message=self.FolderUpdated(folder_id=result.id))
+
+    def _on_prompt_delete_result(self, result: bool) -> None:
+        if result is False:
+            return
+
+        try:
+            prev_selected_index_in_parent = (
+                self.collections_tree.cursor_node.parent.children.index(
+                    self.collections_tree.cursor_node
+                )
+            )
+        except ValueError:
+            prev_selected_index_in_parent = 0
+
+        if self.collections_tree.cursor_node.allow_expand:
+            self.app.folders_repo.delete_by_id(
+                self.collections_tree.cursor_node.data['id']
+            )
+            self.notify('Folder deleted', severity='information')
+            self.populate_children(
+                node=self.collections_tree.cursor_node.parent
+            )
+            self._sync_content_switcher()
+            self.post_message(
+                message=self.FolderDeleted(
+                    folder_id=self.collections_tree.cursor_node.data['id']
+                )
+            )
+        else:
+            self.app.requests_repo.delete_by_id(
+                self.collections_tree.cursor_node.data['id']
+            )
+            self.notify('Request deleted', severity='information')
+            self.populate_children(
+                node=self.collections_tree.cursor_node.parent
+            )
+            self._sync_content_switcher()
+            self.post_message(
+                message=self.RequestDeleted(
+                    request_id=self.collections_tree.cursor_node.data['id']
+                )
+            )
+
+        if self.collections_tree.cursor_node.parent.children:
+            next_index_to_select = min(
+                prev_selected_index_in_parent,
+                len(self.collections_tree.cursor_node.parent.children) - 1,
+            )
+            next_node_to_select = (
+                self.collections_tree.cursor_node.parent.children[
+                    next_index_to_select
+                ]
+            )
+        else:
+            next_node_to_select = self.collections_tree.cursor_node.parent
+        self.call_after_refresh(
+            lambda: self.collections_tree.select_node(next_node_to_select)
+        )
 
     def _resolve_all_folder_paths(self) -> list[dict[str, str | int | None]]:
         paths: list[dict[str, str | int | None]] = [{'path': '/', 'id': None}]

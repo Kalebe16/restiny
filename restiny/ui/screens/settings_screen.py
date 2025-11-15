@@ -67,9 +67,9 @@ class SettingsScreen(ModalScreen):
 
     @on(Button.Pressed, '#cancel')
     def _on_cancel(self, message: Button.Pressed) -> None:
-        self.dismiss(result=None)
+        self.dismiss(result=False)
 
     @on(Button.Pressed, '#confirm')
     def _on_confirm(self, message: Button.Pressed) -> None:
-        self.settings_repo.set(Settings(theme=self.theme_select.value))
-        self.dismiss(result=None)
+        self.app.settings_repo.set(Settings(theme=self.theme_select.value))
+        self.dismiss(result=True)

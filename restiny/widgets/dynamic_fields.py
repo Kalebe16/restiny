@@ -214,8 +214,6 @@ class TextDynamicField(DynamicField):
     @on(CustomInput.Changed, '#key')
     @on(CustomInput.Changed, '#value')
     def on_input_changed(self, message: CustomInput.Changed) -> None:
-        self.enabled_switch.value = True
-
         if self.is_empty:
             self.post_message(message=self.Empty(field=self))
         elif self.is_filled:
@@ -409,8 +407,6 @@ class TextOrFileDynamicField(DynamicField):
     def on_input_changed(
         self, message: CustomInput.Changed | PathChooser.Changed
     ) -> None:
-        self.enabled_switch.value = True
-
         if self.is_empty:
             self.post_message(message=self.Empty(field=self))
         elif self.is_filled:
