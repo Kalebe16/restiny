@@ -6,3 +6,4 @@ pyenv.cfg
 *.egg-info
 *.spec
 **/__pycache__/
+DEV_NOTES.md

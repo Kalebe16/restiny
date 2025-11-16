@@ -1,16 +1,9 @@
-from dataclasses import dataclass
-
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label
-
-
-@dataclass
-class ConfirmPromptResult:
-    confirmed: bool
 
 
 class ConfirmPrompt(ModalScreen):
@@ -69,8 +62,8 @@ class ConfirmPrompt(ModalScreen):
 
     @on(Button.Pressed, '#cancel')
     def _on_cancel(self, message: Button.Pressed) -> None:
-        self.dismiss(result=ConfirmPromptResult(confirmed=False))
+        self.dismiss(result=False)
 
     @on(Button.Pressed, '#confirm')
     def _on_confirm(self, message: Button.Pressed) -> None:
-        self.dismiss(result=ConfirmPromptResult(confirmed=True))
+        self.dismiss(result=True)

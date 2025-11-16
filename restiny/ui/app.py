@@ -16,13 +16,14 @@ from textual.widgets import Footer, Header
 from restiny.__about__ import __version__
 from restiny.assets import STYLE_TCSS
 from restiny.consts import CUSTOM_THEMES
+from restiny.data.db import DBManager
 from restiny.data.repos import (
     EnvironmentsSQLRepo,
     FoldersSQLRepo,
     RequestsSQLRepo,
     SettingsSQLRepo,
 )
-from restiny.entities import Request, Settings
+from restiny.entities import Request
 from restiny.enums import (
     AuthMode,
     BodyMode,
@@ -36,9 +37,11 @@ from restiny.ui import (
     TopBarArea,
     URLArea,
 )
-from restiny.ui.environments_screen import EnvironmentsScreen
-from restiny.ui.response_area import ResponseAreaData
-from restiny.ui.settings_screen import SettingsScreen
+from restiny.ui.screens.environments_screen import EnvironmentsScreen
+from restiny.ui.screens.postman_collection_import_screen import (
+    PostmanCollectionImportScreen,
+)
+from restiny.ui.screens.settings_screen import SettingsScreen
 from restiny.widgets.custom_text_area import CustomTextArea
 
 
@@ -90,6 +93,7 @@ class RESTinyApp(App, inherit_bindings=False):
 
     def __init__(
         self,
+        db_manager: DBManager,
         folders_repo: FoldersSQLRepo,
         requests_repo: RequestsSQLRepo,
         settings_repo: SettingsSQLRepo,
@@ -98,6 +102,7 @@ class RESTinyApp(App, inherit_bindings=False):
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
+        self.db_manager = db_manager
         self.folders_repo = folders_repo
         self.requests_repo = requests_repo
         self.settings_repo = settings_repo
@@ -135,11 +140,11 @@ class RESTinyApp(App, inherit_bindings=False):
         self._apply_settings()
 
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
-        yield SystemCommand('Copy as cURL', None, self.action_copy_as_curl)
+        yield SystemCommand('Copy as cURL', None, self.copy_as_curl)
         yield SystemCommand(
             'Show/Hide keys and help panel',
             None,
-            self.action_toggle_help_panel,
+            self.toggle_help_panel,
         )
         yield SystemCommand(
             'Save screenshot',
@@ -147,10 +152,13 @@ class RESTinyApp(App, inherit_bindings=False):
             lambda: self.set_timer(0.1, self.deliver_screenshot),
         )
         yield SystemCommand(
-            'Manage environments', None, self.action_manage_envs
+            'Manage environments', None, self.manage_environments
         )
+        yield SystemCommand('Manage settings', None, self.manage_settings)
         yield SystemCommand(
-            'Manage settings', None, self.action_manage_settings
+            'Import postman collection',
+            None,
+            self.import_postman_collection,
         )
 
     def action_toggle_collections(self) -> None:
@@ -175,7 +183,7 @@ class RESTinyApp(App, inherit_bindings=False):
 
         req = self.get_request()
         self.requests_repo.update(request=req)
-        self.collections_area._populate_children(
+        self.collections_area.populate_children(
             self.collections_area.collections_tree.current_parent_folder
         )
         self.notify('Saved changes', severity='information')
@@ -190,13 +198,13 @@ class RESTinyApp(App, inherit_bindings=False):
         else:
             self.screen.maximize(self.last_focused_maximizable_area)
 
-    def action_toggle_help_panel(self) -> None:
+    def toggle_help_panel(self) -> None:
         if self.query('HelpPanel'):
             self.action_hide_help_panel()
         else:
             self.action_show_help_panel()
 
-    def action_copy_as_curl(self) -> None:
+    def copy_as_curl(self) -> None:
         if not self.selected_request:
             self.notify(
                 'No request selected',
@@ -211,12 +219,11 @@ class RESTinyApp(App, inherit_bindings=False):
             severity='information',
         )
 
-    def action_manage_settings(self) -> None:
-        def on_settings_result(result: dict | None) -> None:
-            if not result:
+    def manage_settings(self) -> None:
+        def on_settings_result(result: bool) -> None:
+            if result is False:
                 return
 
-            self.settings_repo.set(Settings(theme=result['theme']))
             self._apply_settings()
 
         self.push_screen(
@@ -224,12 +231,26 @@ class RESTinyApp(App, inherit_bindings=False):
             callback=on_settings_result,
         )
 
-    def action_manage_envs(self) -> None:
+    def manage_environments(self) -> None:
         def on_manage_environments_result(result) -> None:
             self.top_bar_area.populate()
 
         self.push_screen(
             screen=EnvironmentsScreen(), callback=on_manage_environments_result
+        )
+
+    def import_postman_collection(self) -> None:
+        def on_import_postman_collection_result(result: bool) -> None:
+            if result is False:
+                return
+
+            self.collections_area.populate_children(
+                self.collections_area.collections_tree.root
+            )
+
+        self.push_screen(
+            screen=PostmanCollectionImportScreen(),
+            callback=on_import_postman_collection_result,
         )
 
     def copy_to_clipboard(self, text: str) -> None:
@@ -448,6 +469,9 @@ class RESTinyApp(App, inherit_bindings=False):
         return request
 
     def set_request(self, request: Request) -> None:
+        self.url_area.clear()
+        self.request_area.clear()
+
         self.url_area.method = request.method
         self.url_area.url = request.url
 
@@ -548,13 +572,6 @@ class RESTinyApp(App, inherit_bindings=False):
             self.url_area.request_pending = False
 
     def _display_response(self, response: httpx.Response) -> None:
-        status = HTTPStatus(response.status_code)
-        size = response.num_bytes_downloaded
-        elapsed_time = round(response.elapsed.total_seconds(), 2)
-        headers = {
-            header_key: header_value
-            for header_key, header_value in response.headers.multi_items()
-        }
         content_type_to_body_language = {
             ContentType.TEXT: BodyRawLanguage.PLAIN,
             ContentType.HTML: BodyRawLanguage.HTML,
@@ -562,17 +579,19 @@ class RESTinyApp(App, inherit_bindings=False):
             ContentType.YAML: BodyRawLanguage.YAML,
             ContentType.XML: BodyRawLanguage.XML,
         }
-        body_raw_language = content_type_to_body_language.get(
-            response.headers.get('Content-Type'), BodyRawLanguage.PLAIN
+
+        self.response_area.status = HTTPStatus(response.status_code)
+        self.response_area.content_size = response.num_bytes_downloaded
+        self.response_area.elapsed_time = round(
+            response.elapsed.total_seconds(), 2
         )
-        body_raw = response.text
-        self.response_area.set_data(
-            data=ResponseAreaData(
-                status=status,
-                size=size,
-                elapsed_time=elapsed_time,
-                headers=headers,
-                body_raw_language=body_raw_language,
-                body_raw=body_raw,
+        self.response_area.headers = {
+            header_key: header_value
+            for header_key, header_value in response.headers.multi_items()
+        }
+        self.response_area.body_raw_language = (
+            content_type_to_body_language.get(
+                response.headers.get('Content-Type'), BodyRawLanguage.PLAIN
             )
         )
+        self.response_area.body_raw = response.text

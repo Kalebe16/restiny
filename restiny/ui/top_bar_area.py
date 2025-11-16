@@ -50,7 +50,7 @@ class TopBarArea(Widget):
         prev_selected_environment = self.environment_select.value
         environments = [
             environment.name
-            for environment in self.app.environments_repo.list().data
+            for environment in self.app.environments_repo.get_all().data
             if environment.name != 'global'
         ]
         self.environment_select.set_options(

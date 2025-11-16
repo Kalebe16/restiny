@@ -65,7 +65,7 @@ restiny = ["assets/**/*"]
 ##########
 [tool.ruff]
 line-length = 79
-target-version = "py314"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "I", "UP"]

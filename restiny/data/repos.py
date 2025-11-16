@@ -1,17 +1,18 @@
-from __future__ import annotations
-
 import json
 import sys
 import traceback
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import UTC
 from enum import StrEnum
 from functools import wraps
-from typing import Any
+from typing import Generic, TypeVar
 
 from sqlalchemy import case, select
 from sqlalchemy.exc import IntegrityError, InterfaceError, OperationalError
+from sqlalchemy.orm import Session
 
 from restiny.data.db import DBManager
 from restiny.data.models import (
@@ -54,10 +55,13 @@ class RepoStatus(StrEnum):
     DB_ERROR = 'db_error'
 
 
+T = TypeVar('T')
+
+
 @dataclass
-class RepoResp:
+class RepoResp(Generic[T]):
     status: RepoStatus = RepoStatus.OK
-    data: Any = None
+    data: T | None = None
 
     @property
     def ok(self) -> bool:
@@ -67,6 +71,17 @@ class RepoResp:
 class SQLRepoBase(ABC):
     def __init__(self, db_manager: DBManager):
         self.db_manager = db_manager
+
+    @contextmanager
+    def _ensure_session(
+        self, existing_session: Session | None
+    ) -> Iterator[Session]:
+        if existing_session:
+            with nullcontext(existing_session) as session:
+                yield session
+        else:
+            with self.db_manager.session_scope() as session:
+                yield session
 
     @property
     @abstractmethod
@@ -80,8 +95,10 @@ class FoldersSQLRepo(SQLRepoBase):
         return [SQLFolder.parent_id.key, SQLFolder.name.key]
 
     @safe_repo
-    def list_by_parent_id(self, parent_id: int) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def get_by_parent_id(
+        self, parent_id: int, session: Session | None = None
+    ) -> RepoResp[list[Folder]]:
+        with self._ensure_session(session) as session:
             sql_folders = session.scalars(
                 select(SQLFolder)
                 .where(SQLFolder.parent_id == parent_id)
@@ -93,8 +110,10 @@ class FoldersSQLRepo(SQLRepoBase):
             return RepoResp(data=folders)
 
     @safe_repo
-    def list_roots(self) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def get_roots(
+        self, session: Session | None = None
+    ) -> RepoResp[list[Folder]]:
+        with self._ensure_session(session) as session:
             sql_folders = session.scalars(
                 select(SQLFolder)
                 .where(SQLFolder.parent_id.is_(None))
@@ -106,8 +125,10 @@ class FoldersSQLRepo(SQLRepoBase):
             return RepoResp(data=folders)
 
     @safe_repo
-    def get_by_id(self, id: int) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def get_by_id(
+        self, id: int, session: Session | None = None
+    ) -> RepoResp[Folder]:
+        with self._ensure_session(session) as session:
             sql_folder = session.get(SQLFolder, id)
             if not sql_folder:
                 return RepoResp(status=RepoStatus.NOT_FOUND)
@@ -116,8 +137,10 @@ class FoldersSQLRepo(SQLRepoBase):
             return RepoResp(data=folder)
 
     @safe_repo
-    def create(self, folder: Folder) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def create(
+        self, folder: Folder, session: Session | None = None
+    ) -> RepoResp[Folder]:
+        with self._ensure_session(session) as session:
             sql_folder = self._folder_to_sql(folder)
             session.add(sql_folder)
             session.flush()
@@ -125,8 +148,10 @@ class FoldersSQLRepo(SQLRepoBase):
             return RepoResp(data=new_folder)
 
     @safe_repo
-    def update(self, folder: Folder) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def update(
+        self, folder: Folder, session: Session | None = None
+    ) -> RepoResp[Folder]:
+        with self._ensure_session(session) as session:
             sql_folder = session.get(SQLFolder, folder.id)
             if not sql_folder:
                 return RepoResp(status=RepoStatus.NOT_FOUND)
@@ -141,8 +166,10 @@ class FoldersSQLRepo(SQLRepoBase):
             return RepoResp(data=new_folder)
 
     @safe_repo
-    def delete_by_id(self, id: int) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def delete_by_id(
+        self, id: int, session: Session | None = None
+    ) -> RepoResp[None]:
+        with self._ensure_session(session) as session:
             sql_folder = session.get(SQLFolder, id)
             if not sql_folder:
                 return RepoResp(status=RepoStatus.NOT_FOUND)
@@ -171,8 +198,10 @@ class FoldersSQLRepo(SQLRepoBase):
 
 class RequestsSQLRepo(SQLRepoBase):
     @safe_repo
-    def list_by_folder_id(self, folder_id: int) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def get_by_folder_id(
+        self, folder_id: int, session: Session | None = None
+    ) -> RepoResp[list[Request]]:
+        with self._ensure_session(session) as session:
             sql_requests = session.scalars(
                 select(SQLRequest)
                 .where(SQLRequest.folder_id == folder_id)
@@ -184,8 +213,10 @@ class RequestsSQLRepo(SQLRepoBase):
             return RepoResp(data=requests)
 
     @safe_repo
-    def get_by_id(self, id: int) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def get_by_id(
+        self, id: int, session: Session | None = None
+    ) -> RepoResp[Request]:
+        with self._ensure_session(session) as session:
             sql_request = session.get(SQLRequest, id)
 
             if not sql_request:
@@ -195,8 +226,10 @@ class RequestsSQLRepo(SQLRepoBase):
             return RepoResp(data=request)
 
     @safe_repo
-    def create(self, request: Request) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def create(
+        self, request: Request, session: Session | None = None
+    ) -> RepoResp[Request]:
+        with self._ensure_session(session) as session:
             sql_request = self._request_to_sql(request)
             session.add(sql_request)
             session.flush()
@@ -204,8 +237,10 @@ class RequestsSQLRepo(SQLRepoBase):
             return RepoResp(data=new_request)
 
     @safe_repo
-    def update(self, request: Request) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def update(
+        self, request: Request, session: Session | None = None
+    ) -> RepoResp[Request]:
+        with self._ensure_session(session) as session:
             sql_request = session.get(SQLRequest, request.id)
             if not sql_request:
                 return RepoResp(status=RepoStatus.NOT_FOUND)
@@ -220,8 +255,10 @@ class RequestsSQLRepo(SQLRepoBase):
             return RepoResp(data=new_request)
 
     @safe_repo
-    def delete_by_id(self, id: int) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def delete_by_id(
+        self, id: int, session: Session | None = None
+    ) -> RepoResp[None]:
+        with self._ensure_session(session) as session:
             sql_request = session.get(SQLRequest, id)
             if not sql_request:
                 return RepoResp(status=RepoStatus.NOT_FOUND)
@@ -306,8 +343,8 @@ class RequestsSQLRepo(SQLRepoBase):
 
 class SettingsSQLRepo(SQLRepoBase):
     @safe_repo
-    def get(self) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def get(self, session: Session | None = None) -> RepoResp[Settings]:
+        with self._ensure_session(session) as session:
             sql_settings = session.scalar(select(SQLSettings).limit(1))
 
             if not sql_settings:
@@ -317,8 +354,10 @@ class SettingsSQLRepo(SQLRepoBase):
             return RepoResp(data=settings)
 
     @safe_repo
-    def set(self, settings: Settings) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def set(
+        self, settings: Settings, session: Session | None = None
+    ) -> RepoResp[Settings]:
+        with self._ensure_session(session) as session:
             sql_settings = session.scalar(select(SQLSettings).limit(1))
 
             if not sql_settings:
@@ -360,8 +399,10 @@ class SettingsSQLRepo(SQLRepoBase):
 
 class EnvironmentsSQLRepo(SQLRepoBase):
     @safe_repo
-    def get_by_id(self, id: int) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def get_by_id(
+        self, id: int, session: Session | None = None
+    ) -> RepoResp[Environment]:
+        with self._ensure_session(session) as session:
             sql_environment = session.get(SQLEnvironment, id)
 
             if not sql_environment:
@@ -371,8 +412,10 @@ class EnvironmentsSQLRepo(SQLRepoBase):
             return RepoResp(data=environment)
 
     @safe_repo
-    def get_by_name(self, name: str) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def get_by_name(
+        self, name: str, session: Session | None = None
+    ) -> RepoResp[Environment]:
+        with self._ensure_session(session) as session:
             sql_environment = session.scalar(
                 select(SQLEnvironment).where(SQLEnvironment.name == name)
             )
@@ -384,8 +427,10 @@ class EnvironmentsSQLRepo(SQLRepoBase):
             return RepoResp(data=environment)
 
     @safe_repo
-    def list(self) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def get_all(
+        self, session: Session | None = None
+    ) -> RepoResp[list[Environment]]:
+        with self._ensure_session(session) as session:
             sql_envs = session.scalars(
                 select(SQLEnvironment).order_by(
                     case((SQLEnvironment.name == 'global', 0), else_=1),
@@ -396,8 +441,10 @@ class EnvironmentsSQLRepo(SQLRepoBase):
             return RepoResp(data=envs)
 
     @safe_repo
-    def create(self, environment: Environment) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def create(
+        self, environment: Environment, session: Session | None = None
+    ) -> RepoResp[Environment]:
+        with self._ensure_session(session) as session:
             sql_env = self._environment_to_sql(environment)
             session.add(sql_env)
             session.flush()
@@ -405,8 +452,10 @@ class EnvironmentsSQLRepo(SQLRepoBase):
             return RepoResp(data=new_env)
 
     @safe_repo
-    def update(self, environment: Environment) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def update(
+        self, environment: Environment, session: Session | None = None
+    ) -> RepoResp[Environment]:
+        with self._ensure_session(session) as session:
             sql_environment = session.get(SQLEnvironment, environment.id)
             if not sql_environment:
                 return RepoResp(status=RepoStatus.NOT_FOUND)
@@ -421,8 +470,10 @@ class EnvironmentsSQLRepo(SQLRepoBase):
             return RepoResp(data=new_environment)
 
     @safe_repo
-    def delete_by_id(self, id: int) -> RepoResp:
-        with self.db_manager.session_scope() as session:
+    def delete_by_id(
+        self, id: int, session: Session | None = None
+    ) -> RepoResp[None]:
+        with self._ensure_session(session) as session:
             sql_environment = session.get(SQLEnvironment, id)
             if not sql_environment:
                 return RepoResp(status=RepoStatus.NOT_FOUND)
