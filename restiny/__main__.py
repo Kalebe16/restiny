@@ -30,6 +30,7 @@ def run_app() -> None:
     db_manager = DBManager(db_url=f'sqlite:///{DB_FILE}')
     db_manager.run_migrations()
     app = RESTinyApp(
+        db_manager=db_manager,
         folders_repo=FoldersSQLRepo(db_manager=db_manager),
         requests_repo=RequestsSQLRepo(db_manager=db_manager),
         settings_repo=SettingsSQLRepo(db_manager=db_manager),
