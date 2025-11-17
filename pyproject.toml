@@ -58,7 +58,8 @@ version = { attr = "restiny.__about__.__version__" }
 include = ["restiny*"]
 
 [tool.setuptools.package-data]
-restiny = ["assets/**/*"]
+restiny = ["assets/**/*", "data/sql/**/*"]
+
 
 ##########
 ## Ruff ##

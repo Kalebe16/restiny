@@ -35,10 +35,16 @@ class DBManager:
     def run_migrations(self) -> None:
         version_in_db = self._get_version()
 
-        for sql_script in sorted(
+        sql_scripts = sorted(
             SQL_DIR.glob('[0-9]*_*.sql'),
             key=lambda path: int(path.stem.split('_', 1)[0]),
-        ):
+        )
+        if not sql_scripts:
+            raise Exception(
+                f'No SQL files found in {SQL_DIR} - database cannot be initialized'
+            )
+
+        for sql_script in sql_scripts:
             version_in_script = int(sql_script.stem.split('_', 1)[0])
             if version_in_script <= version_in_db:
                 continue
