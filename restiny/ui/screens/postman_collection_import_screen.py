@@ -75,7 +75,7 @@ class PostmanCollectionImportScreen(ModalScreen):
         self.cancel_button = self.query_one('#cancel', Button)
         self.confirm_button = self.query_one('#confirm', Button)
 
-        self.modal_content.border_title = 'Postman import'
+        self.modal_content.border_title = 'Postman collection import'
 
     @on(Button.Pressed, '#cancel')
     def _on_cancel(self) -> None:
