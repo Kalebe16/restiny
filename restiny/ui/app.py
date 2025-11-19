@@ -261,6 +261,12 @@ class RESTinyApp(App, inherit_bindings=False):
         except Exception:
             pass
 
+    def bell(self) -> None:
+        """
+        Override Textual's bell method to suppress terminal beep sounds
+        """
+        pass
+
     @on(DescendantFocus)
     def _on_focus(self, event: DescendantFocus) -> None:
         self.last_focused_widget = event.widget
