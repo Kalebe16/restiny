@@ -166,7 +166,7 @@ class TextDynamicField(DynamicField):
         )
         yield Button(label='➖', tooltip='Remove field', id='remove')
 
-    async def on_mount(self) -> None:
+    def on_mount(self) -> None:
         self.enabled_switch = self.query_one('#enabled', Switch)
         self.key_input = self.query_one('#key', CustomInput)
         self.value_input = self.query_one('#value', CustomInput)
@@ -479,7 +479,9 @@ class DynamicFields(Widget):
 
     @property
     def fields(self) -> list[DynamicField]:
-        return list(self.query(DynamicField))
+        return list(
+            field for field in self.query(DynamicField) if field.is_mounted
+        )
 
     @property
     def empty_fields(self) -> list[DynamicField]:

@@ -99,7 +99,7 @@ class EnvironmentsScreen(ModalScreen):
                         id='variables',
                     )
                     yield Label(
-                        "[i]Tip: You can use [b]'{{var}}'[/] or [b]'${var}'[/] in requests to reference variables.[/]",
+                        "[i]Tip: You can use [b]'{{var}}'[/] or [b]'${var}'[/] to reference variables.[/]",
                         classes='mt-1',
                     )
             with Horizontal(classes='w-auto h-auto'):

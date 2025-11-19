@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import mimetypes
 from datetime import datetime
@@ -125,21 +127,21 @@ class Request(BaseModel):
     updated_at: datetime | None = None
 
     def resolve_variables(
-        self, variables: list['Environment.Variable']
+        self, variables: list[Environment.Variable]
     ) -> 'Request':
         def _resolve_variables(value: str) -> str:
-            new_value = value
+            resolved_value = value
             for variable in variables:
                 if not variable.enabled:
                     continue
 
-                new_value = new_value.replace(
+                resolved_value = resolved_value.replace(
                     '{{' + variable.key + '}}', variable.value
                 )
-                new_value = new_value.replace(
+                resolved_value = resolved_value.replace(
                     '${' + variable.key + '}', variable.value
                 )
-            return new_value
+            return resolved_value
 
         resolved_url = _resolve_variables(self.url)
 
@@ -436,3 +438,32 @@ class Environment(BaseModel):
 
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+    def resolve_variables(self) -> Environment:
+        var_key_to_var_value: dict[str, str] = {
+            var.key: var.value for var in self.variables if var.enabled
+        }
+
+        def _resolve_variables(value: str) -> str:
+            resolved_value = value
+            for var_key, var_value in var_key_to_var_value.items():
+                resolved_value = resolved_value.replace(
+                    '{{' + var_key + '}}', var_value
+                )
+                resolved_value = resolved_value.replace(
+                    '${' + var_key + '}', var_value
+                )
+
+            return resolved_value
+
+        resolved_vars = []
+        for variable in self.variables:
+            resolved_vars.append(
+                Environment.Variable(
+                    enabled=variable.enabled,
+                    key=variable.key,
+                    value=_resolve_variables(variable.value),
+                )
+            )
+
+        return self.model_copy(update=dict(variables=resolved_vars))

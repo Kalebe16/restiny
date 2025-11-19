@@ -41,6 +41,9 @@ from restiny.ui.screens.environments_screen import EnvironmentsScreen
 from restiny.ui.screens.postman_collection_import_screen import (
     PostmanCollectionImportScreen,
 )
+from restiny.ui.screens.postman_environment_import_screen import (
+    PostmanEnvironmentImportScreen,
+)
 from restiny.ui.screens.settings_screen import SettingsScreen
 from restiny.widgets.custom_text_area import CustomTextArea
 
@@ -160,6 +163,9 @@ class RESTinyApp(App, inherit_bindings=False):
             None,
             self.import_postman_collection,
         )
+        yield SystemCommand(
+            'Import postman environment', None, self.import_postman_environment
+        )
 
     def action_toggle_collections(self) -> None:
         if self.collections_area.display:
@@ -251,6 +257,16 @@ class RESTinyApp(App, inherit_bindings=False):
         self.push_screen(
             screen=PostmanCollectionImportScreen(),
             callback=on_import_postman_collection_result,
+        )
+
+    def import_postman_environment(self) -> None:
+        def on_import_postman_environment_result(result: bool) -> None:
+            if result is False:
+                return
+
+        self.push_screen(
+            screen=PostmanEnvironmentImportScreen(),
+            callback=on_import_postman_environment_result,
         )
 
     def copy_to_clipboard(self, text: str) -> None:
@@ -464,14 +480,16 @@ class RESTinyApp(App, inherit_bindings=False):
         global_environment = self.environments_repo.get_by_name(
             name='global'
         ).data
+        resolved_global_environment = global_environment.resolve_variables()
         request = self.get_request().resolve_variables(
-            global_environment.variables
+            resolved_global_environment.variables
         )
         if self.top_bar_area.environment:
             environment = self.environments_repo.get_by_name(
                 name=self.top_bar_area.environment
             ).data
-            request = request.resolve_variables(environment.variables)
+            resolved_environment = environment.resolve_variables()
+            request = request.resolve_variables(resolved_environment.variables)
         return request
 
     def set_request(self, request: Request) -> None:

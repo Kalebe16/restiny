@@ -43,10 +43,6 @@ class PostmanCollectionImportScreen(ModalScreen):
         border-title-color: gray;
         background: $surface;
     }
-
-    Label {
-        margin-left: 4;
-    }
     """
 
     BINDINGS = [
@@ -96,6 +92,12 @@ class PostmanCollectionImportScreen(ModalScreen):
             return
         except _ImportFailedError:
             self.notify('Failed to import the collection', severity='error')
+            return
+        except Exception:
+            self.notify(
+                'Failed to import the collection; unexpected error',
+                severity='error',
+            )
             return
 
         self.notify(message='Collection imported', severity='information')
