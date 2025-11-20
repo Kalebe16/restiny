@@ -128,7 +128,7 @@ class Request(BaseModel):
 
     def resolve_variables(
         self, variables: list[Environment.Variable]
-    ) -> 'Request':
+    ) -> Request:
         def _resolve_variables(value: str) -> str:
             resolved_value = value
             for variable in variables:

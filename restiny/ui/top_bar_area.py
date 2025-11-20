@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
@@ -10,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class TopBarArea(Widget):
-    app: 'RESTinyApp'
+    app: RESTinyApp
 
     DEFAULT_CSS = """
     TopBarArea {

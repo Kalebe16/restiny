@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from typing import TYPE_CHECKING
 
@@ -24,7 +26,7 @@ class _ImportInvalidFileError(Exception):
 
 
 class PostmanEnvironmentImportScreen(ModalScreen):
-    app: 'RESTinyApp'
+    app: RESTinyApp
 
     DEFAULT_CSS = """
     PostmanEnvironmentImportScreen {

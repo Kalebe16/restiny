@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import abstractmethod
 from enum import StrEnum
 from pathlib import Path
@@ -60,12 +62,12 @@ class DynamicField(Widget):
         Sent when the user enables the field.
         """
 
-        def __init__(self, field: 'DynamicField') -> None:
+        def __init__(self, field: DynamicField) -> None:
             super().__init__()
             self.field = field
 
         @property
-        def control(self) -> 'DynamicField':
+        def control(self) -> DynamicField:
             return self.field
 
     class Disabled(Message):
@@ -73,12 +75,12 @@ class DynamicField(Widget):
         Sent when the user disables the field.
         """
 
-        def __init__(self, field: 'DynamicField') -> None:
+        def __init__(self, field: DynamicField) -> None:
             super().__init__()
             self.field = field
 
         @property
-        def control(self) -> 'DynamicField':
+        def control(self) -> DynamicField:
             return self.field
 
     class Empty(Message):
@@ -86,12 +88,12 @@ class DynamicField(Widget):
         Sent when the key input and value input is empty.
         """
 
-        def __init__(self, field: 'DynamicField') -> None:
+        def __init__(self, field: DynamicField) -> None:
             super().__init__()
             self.field = field
 
         @property
-        def control(self) -> 'DynamicField':
+        def control(self) -> DynamicField:
             return self.field
 
     class Filled(Message):
@@ -99,12 +101,12 @@ class DynamicField(Widget):
         Sent when the key input or value input is filled.
         """
 
-        def __init__(self, field: 'DynamicField') -> None:
+        def __init__(self, field: DynamicField) -> None:
             super().__init__()
             self.field = field
 
         @property
-        def control(self) -> 'DynamicField':
+        def control(self) -> DynamicField:
             return self.field
 
     class RemoveRequested(Message):
@@ -114,12 +116,12 @@ class DynamicField(Widget):
         to actually remove the field or not.
         """
 
-        def __init__(self, field: 'DynamicField') -> None:
+        def __init__(self, field: DynamicField) -> None:
             super().__init__()
             self.field = field
 
         @property
-        def control(self) -> 'DynamicField':
+        def control(self) -> DynamicField:
             return self.field
 
 
@@ -434,15 +436,13 @@ class DynamicFields(Widget):
         Sent when one of the fields becomes empty.
         """
 
-        def __init__(
-            self, fields: 'DynamicFields', field: DynamicField
-        ) -> None:
+        def __init__(self, fields: DynamicFields, field: DynamicField) -> None:
             super().__init__()
             self.fields = fields
             self.field = field
 
         @property
-        def control(self) -> 'DynamicFields':
+        def control(self) -> DynamicFields:
             return self.fields
 
     class FieldFilled(Message):
@@ -450,15 +450,13 @@ class DynamicFields(Widget):
         Sent when one of the fields becomes filled.
         """
 
-        def __init__(
-            self, fields: 'DynamicFields', field: DynamicField
-        ) -> None:
+        def __init__(self, fields: DynamicFields, field: DynamicField) -> None:
             super().__init__()
             self.fields = fields
             self.field = field
 
         @property
-        def control(self) -> 'DynamicFields':
+        def control(self) -> DynamicFields:
             return self.fields
 
     def __init__(

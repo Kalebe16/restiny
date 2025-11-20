@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from textual import on
@@ -30,7 +32,7 @@ if TYPE_CHECKING:
 
 
 class CollectionsArea(Widget):
-    app: 'RESTinyApp'
+    app: RESTinyApp
 
     ALLOW_MAXIMIZE = True
     focusable = True

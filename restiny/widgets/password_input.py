@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from enum import StrEnum
 
 from textual import on
@@ -56,13 +58,13 @@ class PasswordInput(Widget):
         Sent when value changed.
         """
 
-        def __init__(self, input: 'PasswordInput', value: str):
+        def __init__(self, input: PasswordInput, value: str):
             super().__init__()
             self.input = input
             self.value = value
 
         @property
-        def control(self) -> 'PasswordInput':
+        def control(self) -> PasswordInput:
             return self.input
 
     class Shown(Message):
@@ -70,12 +72,12 @@ class PasswordInput(Widget):
         Sent when the value becomes visible.
         """
 
-        def __init__(self, input: 'PasswordInput') -> None:
+        def __init__(self, input: PasswordInput) -> None:
             super().__init__()
             self.input = input
 
         @property
-        def control(self) -> 'PasswordInput':
+        def control(self) -> PasswordInput:
             return self.input
 
     class Hidden(Message):
@@ -83,12 +85,12 @@ class PasswordInput(Widget):
         Sent when the value becomes hidden.
         """
 
-        def __init__(self, input: 'PasswordInput') -> None:
+        def __init__(self, input: PasswordInput) -> None:
             super().__init__()
             self.input = input
 
         @property
-        def control(self) -> 'PasswordInput':
+        def control(self) -> PasswordInput:
             return self.input
 
     def __init__(self, *args, **kwargs) -> None:

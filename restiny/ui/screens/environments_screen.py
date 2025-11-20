@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from textual import on
@@ -16,7 +18,7 @@ if TYPE_CHECKING:
 
 
 class EnvironmentsScreen(ModalScreen):
-    app: 'RESTinyApp'
+    app: RESTinyApp
 
     DEFAULT_CSS = """
     EnvironmentsScreen {
