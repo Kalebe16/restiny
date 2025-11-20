@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from typing import TYPE_CHECKING
 
@@ -29,7 +31,7 @@ class _ImportInvalidFileError(Exception):
 
 
 class PostmanCollectionImportScreen(ModalScreen):
-    app: 'RESTinyApp'
+    app: RESTinyApp
 
     DEFAULT_CSS = """
     PostmanCollectionImportScreen {
@@ -42,10 +44,6 @@ class PostmanCollectionImportScreen(ModalScreen):
         border: heavy black;
         border-title-color: gray;
         background: $surface;
-    }
-
-    Label {
-        margin-left: 4;
     }
     """
 
@@ -96,6 +94,12 @@ class PostmanCollectionImportScreen(ModalScreen):
             return
         except _ImportFailedError:
             self.notify('Failed to import the collection', severity='error')
+            return
+        except Exception:
+            self.notify(
+                'Failed to import the collection; unexpected error',
+                severity='error',
+            )
             return
 
         self.notify(message='Collection imported', severity='information')

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from enum import StrEnum
 from pathlib import Path
 
@@ -214,22 +216,22 @@ class PathChooser(Widget):
         """
 
         def __init__(
-            self, path_chooser: 'PathChooser', path: Path | None
+            self, path_chooser: PathChooser, path: Path | None
         ) -> None:
             super().__init__()
             self.path_chooser = path_chooser
             self.path = path
 
         @property
-        def control(self) -> 'PathChooser':
+        def control(self) -> PathChooser:
             return self.path_chooser
 
     @classmethod
-    def file(cls, *args, **kwargs) -> 'PathChooser':
+    def file(cls, *args, **kwargs) -> PathChooser:
         return cls(*args, **kwargs, path_type=_PathType.FILE)
 
     @classmethod
-    def directory(cls, *args, **kwargs) -> 'PathChooser':
+    def directory(cls, *args, **kwargs) -> PathChooser:
         return cls(*args, **kwargs, path_type=_PathType.DIR)
 
     def __init__(

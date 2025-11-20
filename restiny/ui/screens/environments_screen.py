@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from textual import on
@@ -16,7 +18,7 @@ if TYPE_CHECKING:
 
 
 class EnvironmentsScreen(ModalScreen):
-    app: 'RESTinyApp'
+    app: RESTinyApp
 
     DEFAULT_CSS = """
     EnvironmentsScreen {
@@ -99,7 +101,7 @@ class EnvironmentsScreen(ModalScreen):
                         id='variables',
                     )
                     yield Label(
-                        "[i]Tip: You can use [b]'{{var}}'[/] or [b]'${var}'[/] in requests to reference variables.[/]",
+                        "[i]Tip: You can use [b]'{{var}}'[/] or [b]'${var}'[/] to reference variables.[/]",
                         classes='mt-1',
                     )
             with Horizontal(classes='w-auto h-auto'):

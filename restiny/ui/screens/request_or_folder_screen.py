@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
@@ -162,7 +164,7 @@ class _BaseEditRequestOrFolderScreen(ModalScreen):
 
 
 class AddRequestOrFolderScreen(_BaseEditRequestOrFolderScreen):
-    app: 'RESTinyApp'
+    app: RESTinyApp
 
     @on(Button.Pressed, '#confirm')
     def _on_confirm(self, message: Button.Pressed) -> None:
@@ -211,7 +213,7 @@ class AddRequestOrFolderScreen(_BaseEditRequestOrFolderScreen):
 
 
 class UpdateRequestOrFolderScreen(_BaseEditRequestOrFolderScreen):
-    app: 'RESTinyApp'
+    app: RESTinyApp
 
     def __init__(self, id: int, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
