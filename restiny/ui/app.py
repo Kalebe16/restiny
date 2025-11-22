@@ -38,6 +38,9 @@ from restiny.ui import (
     URLArea,
 )
 from restiny.ui.screens.environments_screen import EnvironmentsScreen
+from restiny.ui.screens.openapi_spec_import_screen import (
+    OpenapiSpecImportScreen,
+)
 from restiny.ui.screens.postman_collection_import_screen import (
     PostmanCollectionImportScreen,
 )
@@ -166,6 +169,9 @@ class RESTinyApp(App, inherit_bindings=False):
         yield SystemCommand(
             'Import postman environment', None, self.import_postman_environment
         )
+        yield SystemCommand(
+            'Import openapi spec', None, self.import_openapi_spec
+        )
 
     def action_toggle_collections(self) -> None:
         if self.collections_area.display:
@@ -267,6 +273,15 @@ class RESTinyApp(App, inherit_bindings=False):
         self.push_screen(
             screen=PostmanEnvironmentImportScreen(),
             callback=on_import_postman_environment_result,
+        )
+
+    def import_openapi_spec(self) -> None:
+        def on_import_openapi_spec(result: bool) -> None:
+            if result is False:
+                return
+
+        self.push_screen(
+            screen=OpenapiSpecImportScreen(), callback=on_import_openapi_spec
         )
 
     def copy_to_clipboard(self, text: str) -> None:
