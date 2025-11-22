@@ -12,10 +12,13 @@ from textual.widgets import Button
 
 from restiny.entities import Folder, Request
 from restiny.enums import AuthMode, BodyMode, BodyRawLanguage
+from restiny.logger import get_logger
 from restiny.widgets import PathChooser
 
 if TYPE_CHECKING:
     from restiny.ui.app import RESTinyApp
+
+logger = get_logger()
 
 
 class _ImportInvalidVersionError(Exception):
@@ -100,6 +103,7 @@ class PostmanCollectionImportScreen(ModalScreen):
                 'Failed to import the collection; unexpected error',
                 severity='error',
             )
+            logger.exception('Failed to impoort the collection')
             return
 
         self.notify(message='Collection imported', severity='information')

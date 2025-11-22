@@ -11,10 +11,14 @@ from textual.screen import ModalScreen
 from textual.widgets import Button
 
 from restiny.entities import Environment
+from restiny.logger import get_logger
 from restiny.widgets import PathChooser
 
 if TYPE_CHECKING:
     from restiny.ui.app import RESTinyApp
+
+
+logger = get_logger()
 
 
 class _ImportFailedError(Exception):
@@ -89,6 +93,7 @@ class PostmanEnvironmentImportScreen(ModalScreen):
                 'Failed to import the environment; unexpected error',
                 severity='error',
             )
+            logger.exception('Failed to import the environment')
             return
 
         self.notify(message='Environment imported', severity='information')
