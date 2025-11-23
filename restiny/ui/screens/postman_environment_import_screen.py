@@ -58,7 +58,9 @@ class PostmanEnvironmentImportScreen(ModalScreen):
     def compose(self) -> ComposeResult:
         with Vertical(id='modal-content'):
             with Horizontal(classes='w-auto h-auto p-1'):
-                yield PathChooser.file(id='environment-file')
+                yield PathChooser.file(
+                    id='environment-file', allowed_file_suffixes=['.json']
+                )
             with Horizontal(classes='w-auto h-auto'):
                 yield Button('Cancel', classes='w-1fr', id='cancel')
                 yield Button('Confirm', classes='w-1fr', id='confirm')

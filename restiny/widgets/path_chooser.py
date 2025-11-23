@@ -8,7 +8,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
-from textual.reactive import Reactive
+from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.widget import Widget
 from textual.widgets import Button, Label, Switch
@@ -39,8 +39,11 @@ class PathChooserScreen(ModalScreen):
             show=False,
         ),
     ]
-    show_hidden_files: Reactive[bool] = Reactive(False, init=True)
-    show_hidden_dirs: Reactive[bool] = Reactive(False, init=True)
+    show_hidden_files: reactive[bool] = reactive(False, init=False)
+    show_hidden_dirs: reactive[bool] = reactive(False, init=False)
+    allowed_file_suffixes: reactive[list[str] | None] = reactive(
+        None, init=False
+    )
 
     def compose(self) -> ComposeResult:
         with Vertical(id='modal-content'):
@@ -67,7 +70,7 @@ class PathChooserScreen(ModalScreen):
                 yield Button(label='Cancel', id='cancel', classes='w-1fr')
                 yield Button(label='Confirm', id='choose', classes='w-1fr')
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         self.modal_content = self.query_one('#modal-content')
         self.switch_show_hidden_files: Switch = self.query_one(
             '#option-show-hidden-files'
@@ -86,6 +89,9 @@ class PathChooserScreen(ModalScreen):
                 target_path=Path.home()
             )
         )
+
+        self._apply_filter_paths()
+        await self.directory_tree.reload()
 
     @on(Switch.Changed, '#option-show-hidden-files')
     def on_toggle_hidden_files(self, message: Switch.Changed) -> None:
@@ -121,45 +127,46 @@ class PathChooserScreen(ModalScreen):
         self.input.tooltip = str(message.path)
 
     async def watch_show_hidden_files(self, value: bool) -> None:
-        if value is True:
-            self.directory_tree.filter_paths = lambda paths: filter_paths(
-                paths=paths,
-                show_hidden_files=True,
-                show_hidden_dirs=self.show_hidden_dirs,
-            )
-        elif value is False:
-            self.directory_tree.filter_paths = lambda paths: filter_paths(
-                paths=paths,
-                show_hidden_files=False,
-                show_hidden_dirs=self.show_hidden_dirs,
-            )
-
+        self._apply_filter_paths()
         await self.directory_tree.reload()
 
     async def watch_show_hidden_dirs(self, value: bool) -> None:
-        if value is True:
-            self.directory_tree.filter_paths = lambda paths: filter_paths(
-                paths=paths,
-                show_hidden_files=self.show_hidden_files,
-                show_hidden_dirs=True,
-            )
-        elif value is False:
-            self.directory_tree.filter_paths = lambda paths: filter_paths(
-                paths=paths,
-                show_hidden_files=self.show_hidden_files,
-                show_hidden_dirs=False,
-            )
-
+        self._apply_filter_paths()
         await self.directory_tree.reload()
+
+    async def watch_allowed_file_suffixes(
+        self, value: list[str] | None
+    ) -> None:
+        self._apply_filter_paths()
+        await self.directory_tree.reload()
+
+    def _apply_filter_paths(self) -> None:
+        self.directory_tree.filter_paths = lambda paths: filter_paths(
+            paths=paths,
+            show_hidden_files=self.show_hidden_files,
+            show_hidden_dirs=self.show_hidden_dirs,
+            allowed_file_suffixes=self.allowed_file_suffixes,
+        )
 
     def validate_selected_path(self, path: Path | None) -> bool:
         raise NotImplementedError()
 
 
 class FileChooserScreen(PathChooserScreen):
-    def on_mount(self) -> None:
-        super().on_mount()
-        self.modal_content.border_title = 'File chooser'
+    def __init__(self, allowed_file_suffixes: list[str] | None = None) -> None:
+        super().__init__()
+        self._initial_allowed_file_suffixes = allowed_file_suffixes
+
+    async def on_mount(self) -> None:
+        await super().on_mount()
+
+        self.allowed_file_suffixes = self._initial_allowed_file_suffixes
+
+        self.modal_content.border_title = 'File chooser '
+        if self.allowed_file_suffixes is not None:
+            self.modal_content.border_title += (
+                '(' + ', '.join(self.allowed_file_suffixes) + ')'
+            )
 
     def validate_selected_path(self, path: Path | None) -> bool:
         if not path or not path.is_file():
@@ -171,8 +178,8 @@ class FileChooserScreen(PathChooserScreen):
 
 
 class DirectoryChooserScreen(PathChooserScreen):
-    def on_mount(self) -> None:
-        super().on_mount()
+    async def on_mount(self) -> None:
+        await super().on_mount()
         self.modal_content.border_title = 'Directory chooser'
 
     def validate_selected_path(self, path: Path | None) -> bool:
@@ -237,13 +244,15 @@ class PathChooser(Widget):
     def __init__(
         self,
         path_type: _PathType,
+        allowed_file_suffixes: list[str] | None = None,
         path: Path | None = None,
         *args,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.path_type = path_type
-        self._path = path
+        self.allowed_file_suffixes = allowed_file_suffixes
+        self._initial_path = path
 
     def compose(self) -> ComposeResult:
         icon = ''
@@ -253,7 +262,7 @@ class PathChooser(Widget):
             icon = ' 🗂 '
 
         yield CustomInput(
-            str(self._path) if self._path else '',
+            str(self._initial_path) if self._initial_path else '',
             placeholder='--empty--',
             select_on_focus=False,
             disabled=True,
@@ -290,7 +299,9 @@ class PathChooser(Widget):
 
         if self.path_type == _PathType.FILE:
             self.app.push_screen(
-                screen=FileChooserScreen(),
+                screen=FileChooserScreen(
+                    allowed_file_suffixes=self.allowed_file_suffixes
+                ),
                 callback=set_path,
             )
         elif self.path_type == _PathType.DIR:
