@@ -3,12 +3,19 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 
+from restiny.consts import DB_FILE
 from restiny.data.sql import SQL_DIR
 
 
 class DBManager:
-    def __init__(self, db_url: str) -> None:
-        self.db_url = db_url
+    def __init__(self, in_memory: bool = False) -> None:
+        self.in_memory = in_memory
+
+        if self.in_memory:
+            self.db_url = 'sqlite:///:memory:'
+        else:
+            self.db_url = f'sqlite:///{DB_FILE}'
+
         self.engine = create_engine(self.db_url, echo=False)
         self.SessionMaker = sessionmaker(
             bind=self.engine, autoflush=True, expire_on_commit=False

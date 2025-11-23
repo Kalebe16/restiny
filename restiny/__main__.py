@@ -15,7 +15,6 @@ def run_app() -> None:
     import os
     import threading
 
-    from restiny.consts import CONF_DIR, DB_FILE
     from restiny.data.db import DBManager
     from restiny.data.repos import (
         EnvironmentsSQLRepo,
@@ -25,9 +24,7 @@ def run_app() -> None:
     )
     from restiny.ui.app import RESTinyApp
 
-    CONF_DIR.mkdir(exist_ok=True)
-    DB_FILE.touch(exist_ok=True)
-    db_manager = DBManager(db_url=f'sqlite:///{DB_FILE}')
+    db_manager = DBManager()
     db_manager.run_migrations()
     app = RESTinyApp(
         db_manager=db_manager,

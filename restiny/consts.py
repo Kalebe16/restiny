@@ -14,8 +14,11 @@ else:
     # When running without pyinstaller
     MODULE_DIR = Path(__file__).resolve().parent
 
-CONF_DIR = Path.home().joinpath('.restiny')
+CONF_DIR = Path.home() / '.restiny'
 DB_FILE = CONF_DIR / 'restiny.sqlite3'
+LOG_FILE = CONF_DIR / 'restiny.log'
+
+CONF_DIR.mkdir(parents=True, exist_ok=True)
 
 # Textual themes
 CUSTOM_THEMES: dict[CustomThemes, dict[Theme | TextAreaTheme]] = {

@@ -1,6 +1,4 @@
 import json
-import sys
-import traceback
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from contextlib import contextmanager, nullcontext
@@ -22,6 +20,9 @@ from restiny.data.models import (
     SQLSettings,
 )
 from restiny.entities import Environment, Folder, Request, Settings
+from restiny.logger import get_logger
+
+logger = get_logger()
 
 
 def safe_repo(func):
@@ -34,15 +35,14 @@ def safe_repo(func):
             InterfaceError,
             OperationalError,
         ):
-            traceback.print_exc(file=sys.stderr)
+            logger.exception('DB error')
             return RepoResp(status=RepoStatus.DB_ERROR)
 
         except IntegrityError as error:
-            error_msg = str(error)
-            if 'UNIQUE' in str(error_msg):
+            if 'UNIQUE' in str(error):
                 return RepoResp(status=RepoStatus.DUPLICATED)
 
-            traceback.print_exc(file=sys.stderr)
+            logger.exception('DB error')
             return RepoResp(status=RepoStatus.DB_ERROR)
 
     return wrapper
