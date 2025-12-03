@@ -12,10 +12,13 @@ from textual.widgets import Button
 
 from restiny.entities import Folder, Request
 from restiny.enums import AuthMode, BodyMode, BodyRawLanguage
+from restiny.logger import get_logger
 from restiny.widgets import PathChooser
 
 if TYPE_CHECKING:
     from restiny.ui.app import RESTinyApp
+
+logger = get_logger()
 
 
 class _ImportInvalidVersionError(Exception):
@@ -59,7 +62,9 @@ class PostmanCollectionImportScreen(ModalScreen):
     def compose(self) -> ComposeResult:
         with Vertical(id='modal-content'):
             with Horizontal(classes='w-auto h-auto p-1'):
-                yield PathChooser.file(id='collection-file')
+                yield PathChooser.file(
+                    id='collection-file', allowed_file_suffixes=['.json']
+                )
             with Horizontal(classes='w-auto h-auto'):
                 yield Button('Cancel', classes='w-1fr', id='cancel')
                 yield Button('Confirm', classes='w-1fr', id='confirm')
@@ -100,6 +105,7 @@ class PostmanCollectionImportScreen(ModalScreen):
                 'Failed to import the collection; unexpected error',
                 severity='error',
             )
+            logger.exception('Failed to impoort the collection')
             return
 
         self.notify(message='Collection imported', severity='information')

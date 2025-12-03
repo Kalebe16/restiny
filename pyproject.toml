@@ -18,8 +18,9 @@ dependencies = [
   "textual[syntax]",
   "httpx>=0.28,<0.29",
   "pyperclip>=1.9,<1.10",
-  "sqlalchemy>=2.0,<3.0",
-  "pydantic>=2.12,<2.13"
+  "sqlalchemy>=2.0,<2.1",
+  "pydantic>=2.12,<2.13",
+  "PyYAML>=6.0,<6.1"
 ]
 keywords = ["restiny", "tui", "http", "client", "terminal", "api", "testing", "textual", "cli", "developer-tool"]
 classifiers = [

@@ -11,10 +11,14 @@ from textual.screen import ModalScreen
 from textual.widgets import Button
 
 from restiny.entities import Environment
+from restiny.logger import get_logger
 from restiny.widgets import PathChooser
 
 if TYPE_CHECKING:
     from restiny.ui.app import RESTinyApp
+
+
+logger = get_logger()
 
 
 class _ImportFailedError(Exception):
@@ -54,7 +58,9 @@ class PostmanEnvironmentImportScreen(ModalScreen):
     def compose(self) -> ComposeResult:
         with Vertical(id='modal-content'):
             with Horizontal(classes='w-auto h-auto p-1'):
-                yield PathChooser.file(id='environment-file')
+                yield PathChooser.file(
+                    id='environment-file', allowed_file_suffixes=['.json']
+                )
             with Horizontal(classes='w-auto h-auto'):
                 yield Button('Cancel', classes='w-1fr', id='cancel')
                 yield Button('Confirm', classes='w-1fr', id='confirm')
@@ -89,6 +95,7 @@ class PostmanEnvironmentImportScreen(ModalScreen):
                 'Failed to import the environment; unexpected error',
                 severity='error',
             )
+            logger.exception('Failed to import the environment')
             return
 
         self.notify(message='Environment imported', severity='information')
