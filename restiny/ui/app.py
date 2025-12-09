@@ -114,11 +114,11 @@ class RESTinyApp(App, inherit_bindings=False):
         self.settings_repo = settings_repo
         self.environments_repo = environments_repo
 
-        self.active_request_task: asyncio.Task | None = None
-        self.last_focused_widget: Widget | None = None
-        self.last_focused_maximizable_area: Widget | None = None
-
+        self._active_request_task: asyncio.Task | None = None
+        self._last_focused_widget: Widget | None = None
+        self._last_focused_maximizable_area: Widget | None = None
         self._selected_request: Request | None = None
+        self._request_id_to_response: dict[int, httpx.Response] = {}
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -201,14 +201,14 @@ class RESTinyApp(App, inherit_bindings=False):
         self.notify('Saved changes', severity='information')
 
     def action_maximize_or_minimize_area(self) -> None:
-        if not self.last_focused_maximizable_area:
+        if not self._last_focused_maximizable_area:
             self.notify('No area focused', severity='warning')
             return
 
         if self.screen.maximized:
             self.screen.minimize()
         else:
-            self.screen.maximize(self.last_focused_maximizable_area)
+            self.screen.maximize(self._last_focused_maximizable_area)
 
     def toggle_help_panel(self) -> None:
         if self.query('HelpPanel'):
@@ -306,32 +306,38 @@ class RESTinyApp(App, inherit_bindings=False):
 
     @on(DescendantFocus)
     def _on_focus(self, event: DescendantFocus) -> None:
-        self.last_focused_widget = event.widget
-        last_focused_maximizable_area = self._find_maximizable_area_by_widget(
+        self._last_focused_widget = event.widget
+        _last_focused_maximizable_area = self._find_maximizable_area_by_widget(
             widget=event.widget
         )
-        if last_focused_maximizable_area:
-            self.last_focused_maximizable_area = last_focused_maximizable_area
+        if _last_focused_maximizable_area:
+            self._last_focused_maximizable_area = (
+                _last_focused_maximizable_area
+            )
 
     @on(URLArea.SendRequest)
     def _on_send_request(self, message: URLArea.SendRequest) -> None:
-        self.active_request_task = asyncio.create_task(self._send_request())
+        self._active_request_task = asyncio.create_task(self._send_request())
 
     @on(URLArea.CancelRequest)
     def _on_cancel_request(self, message: URLArea.CancelRequest) -> None:
-        if self.active_request_task and not self.active_request_task.done():
-            self.active_request_task.cancel()
+        if self._active_request_task and not self._active_request_task.done():
+            self._active_request_task.cancel()
 
     @on(CollectionsArea.RequestSelected)
     def _on_request_selected(
         self, message: CollectionsArea.RequestSelected
     ) -> None:
-        req = self.requests_repo.get_by_id(id=message.request_id).data
-        self.selected_request = req
-        self.set_request(request=req)
+        request = self.requests_repo.get_by_id(id=message.request_id).data
+        self.selected_request = request
+        self.set_request(request=request)
 
-        self.response_area.clear()
-        self.response_area.is_showing_response = False
+        if request.id in self._request_id_to_response.keys():
+            self._display_response(self._request_id_to_response[request.id])
+            self.response_area.is_showing_response = True
+        else:
+            self.response_area.clear()
+            self.response_area.is_showing_response = False
 
     @on(CollectionsArea.RequestUpdated)
     def _on_request_updated(self, message) -> None:
@@ -600,6 +606,8 @@ class RESTinyApp(App, inherit_bindings=False):
                 )
                 self._display_response(response=response)
                 self.response_area.is_showing_response = True
+
+                self._request_id_to_response[request.id] = response
         except httpx.RequestError as error:
             error_name = type(error).__name__
             error_message = str(error)
