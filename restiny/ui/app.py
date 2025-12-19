@@ -1,4 +1,5 @@
 import asyncio
+import json
 from collections.abc import Iterable
 from http import HTTPStatus
 
@@ -647,4 +648,8 @@ class RESTinyApp(App, inherit_bindings=False):
                 response.headers.get('Content-Type'), BodyRawLanguage.PLAIN
             )
         )
-        self.response_area.body_raw = response.text
+        if self.response_area.body_raw_language == BodyRawLanguage.JSON:
+            indented_body_raw = json.dumps(json.loads(response.text), indent=4)
+            self.response_area.body_raw = indented_body_raw
+        else:
+            self.response_area.body_raw = response.text
