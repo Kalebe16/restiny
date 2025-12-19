@@ -6,6 +6,7 @@ from restiny.enums import HTTPMethod
 
 class CollectionsTree(Tree):
     show_root = False
+    guide_depth = 3
 
     def on_mount(self) -> None:
         self.node_by_id: dict[int | None, TreeNode] = {}
