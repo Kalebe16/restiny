@@ -38,6 +38,7 @@ from restiny.ui import (
     TopBarArea,
     URLArea,
 )
+from restiny.ui.screens.auth_presets_screen import AuthPresetsScreen
 from restiny.ui.screens.environments_screen import EnvironmentsScreen
 from restiny.ui.screens.openapi_spec_import_screen import (
     OpenapiSpecImportScreen,
@@ -163,6 +164,9 @@ class RESTinyApp(App, inherit_bindings=False):
         )
         yield SystemCommand('Manage settings', None, self.manage_settings)
         yield SystemCommand(
+            'Manage auth presets', None, self.manage_auth_presets
+        )
+        yield SystemCommand(
             'Import postman collection',
             None,
             self.import_postman_collection,
@@ -250,6 +254,14 @@ class RESTinyApp(App, inherit_bindings=False):
 
         self.push_screen(
             screen=EnvironmentsScreen(), callback=on_manage_environments_result
+        )
+
+    def manage_auth_presets(self) -> None:
+        def on_manage_auth_presets_result(result) -> None:
+            pass
+
+        self.push_screen(
+            screen=AuthPresetsScreen(), callback=on_manage_auth_presets_result
         )
 
     def import_postman_collection(self) -> None:
