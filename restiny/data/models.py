@@ -50,8 +50,7 @@ class SQLRequest(SQLModelBase):
     body: Mapped[str | None] = mapped_column(nullable=True)
 
     auth_enabled: Mapped[bool] = mapped_column(nullable=False)
-    auth_mode: Mapped[str] = mapped_column(nullable=False)
-    auth: Mapped[str | None] = mapped_column(nullable=True)
+    auth_id: Mapped[int | None] = mapped_column(nullable=True)
 
     option_timeout: Mapped[float | None] = mapped_column(nullable=True)
     option_follow_redirects: Mapped[bool] = mapped_column(nullable=False)
@@ -97,6 +96,28 @@ class SQLEnvironment(SQLModelBase):
 
     name: Mapped[str] = mapped_column(nullable=False, unique=True)
     variables: Mapped[str] = mapped_column(nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(),
+        default=func.current_timestamp(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(),
+        default=func.current_timestamp(),
+        onupdate=func.current_timestamp(),
+        nullable=False,
+    )
+
+
+class SQLAuthPreset(SQLModelBase):
+    __tablename__ = 'auth_presets'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+
+    name: Mapped[str] = mapped_column(nullable=False, unique=True)
+    auth_mode: Mapped[str] = mapped_column(nullable=False)
+    auth: Mapped[str] = mapped_column(nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(),

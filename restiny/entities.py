@@ -80,22 +80,6 @@ class Request(BaseModel):
 
         fields: list[Field]
 
-    class BasicAuth(BaseModel):
-        username: str
-        password: str
-
-    class BearerAuth(BaseModel):
-        token: str
-
-    class ApiKeyAuth(BaseModel):
-        key: str
-        value: str
-        where: Literal['header', 'param']
-
-    class DigestAuth(BaseModel):
-        username: str
-        password: str
-
     class Options(BaseModel):
         timeout: float = 5.5
         follow_redirects: bool = True
@@ -118,8 +102,7 @@ class Request(BaseModel):
     ) = None
 
     auth_enabled: bool = False
-    auth_mode: AuthMode = AuthMode.BASIC
-    auth: BasicAuth | BearerAuth | ApiKeyAuth | DigestAuth | None = None
+    auth_id: int | None = None
 
     options: Options = _Field(default_factory=Options)
 
@@ -163,29 +146,6 @@ class Request(BaseModel):
             for param in self.params
         ]
 
-        resolved_auth = self.auth
-        if self.auth_enabled:
-            if self.auth_mode == AuthMode.BASIC:
-                resolved_auth = self.BasicAuth(
-                    username=_resolve_variables(self.auth.username),
-                    password=_resolve_variables(self.auth.password),
-                )
-            elif self.auth_mode == AuthMode.BEARER:
-                resolved_auth = self.BearerAuth(
-                    token=_resolve_variables(self.auth.token)
-                )
-            elif self.auth_mode == AuthMode.API_KEY:
-                resolved_auth = self.ApiKeyAuth(
-                    key=_resolve_variables(self.auth.key),
-                    value=_resolve_variables(self.auth.value),
-                    where=self.auth.where,
-                )
-            elif self.auth_mode == AuthMode.DIGEST:
-                resolved_auth = self.DigestAuth(
-                    username=_resolve_variables(self.auth.username),
-                    password=_resolve_variables(self.auth.password),
-                )
-
         resolved_body = self.body
         if self.body_enabled:
             if self.body_mode == BodyMode.RAW:
@@ -225,7 +185,6 @@ class Request(BaseModel):
                 headers=resolved_headers,
                 params=resolved_params,
                 body=resolved_body,
-                auth=resolved_auth,
             )
         )
 
@@ -325,31 +284,7 @@ class Request(BaseModel):
                 files=form_multipart_files,
             )
 
-    def to_httpx_auth(self) -> httpx.Auth | None:
-        if not self.auth_enabled:
-            return
-
-        if self.auth_mode == AuthMode.BASIC:
-            return httpx.BasicAuth(
-                username=self.auth.username, password=self.auth.password
-            )
-        elif self.auth_mode == AuthMode.BEARER:
-            return httpx_auths.BearerAuth(token=self.auth.token)
-        elif self.auth_mode == AuthMode.API_KEY:
-            if self.auth.where == 'header':
-                return httpx_auths.APIKeyHeaderAuth(
-                    key=self.auth.key, value=self.auth.value
-                )
-            elif self.auth.where == 'param':
-                return httpx_auths.APIKeyParamAuth(
-                    key=self.auth.key, value=self.auth.value
-                )
-        elif self.auth_mode == AuthMode.DIGEST:
-            return httpx.DigestAuth(
-                username=self.auth.username, password=self.auth.password
-            )
-
-    def to_curl(self) -> str:
+    def to_curl(self, auth: AuthPreset) -> str:
         headers: dict[str, str] = {
             header.key: header.value
             for header in self.headers
@@ -381,23 +316,37 @@ class Request(BaseModel):
             elif self.body_mode == BodyMode.FILE:
                 body_files = [self.body]
 
+        auth_preset = auth
+
         auth_basic = None
         auth_bearer = None
         auth_api_key_header = None
         auth_api_key_param = None
         auth_digest = None
-        if self.auth_enabled:
-            if self.auth_mode == AuthMode.BASIC:
-                auth_basic = (self.auth.username, self.auth.password)
-            elif self.auth_mode == AuthMode.BEARER:
-                auth_bearer = self.auth.token
-            elif self.auth_mode == AuthMode.API_KEY:
-                if self.auth.where == 'header':
-                    auth_api_key_header = (self.auth.key, self.auth.value)
-                elif self.auth.where == 'param':
-                    auth_api_key_param = (self.auth.key, self.auth.value)
-            elif self.auth_mode == AuthMode.DIGEST:
-                auth_digest = (self.auth.username, self.auth.password)
+        if self.auth_enabled and auth_preset:
+            if auth_preset.auth_mode == AuthMode.BASIC:
+                auth_basic = (
+                    auth_preset.auth.username,
+                    auth_preset.auth.password,
+                )
+            elif auth_preset.auth_mode == AuthMode.BEARER:
+                auth_bearer = auth_preset.auth.token
+            elif auth_preset.auth_mode == AuthMode.API_KEY:
+                if auth_preset.auth.where == 'header':
+                    auth_api_key_header = (
+                        auth_preset.auth.key,
+                        auth_preset.auth.value,
+                    )
+                elif auth_preset.auth.where == 'param':
+                    auth_api_key_param = (
+                        auth_preset.auth.key,
+                        auth_preset.auth.value,
+                    )
+            elif auth_preset.auth_mode == AuthMode.DIGEST:
+                auth_digest = (
+                    auth_preset.auth.username,
+                    auth_preset.auth.password,
+                )
 
         return build_curl_cmd(
             method=self.method,
@@ -467,3 +416,91 @@ class Environment(BaseModel):
             )
 
         return self.model_copy(update=dict(variables=resolved_vars))
+
+
+class AuthPreset(BaseModel):
+    class BasicAuth(BaseModel):
+        username: str
+        password: str
+
+    class BearerAuth(BaseModel):
+        token: str
+
+    class ApiKeyAuth(BaseModel):
+        key: str
+        value: str
+        where: Literal['header', 'param']
+
+    class DigestAuth(BaseModel):
+        username: str
+        password: str
+
+    id: int | None = None
+
+    name: str
+    auth_mode: AuthMode = AuthMode.BASIC
+    auth: BasicAuth | BearerAuth | ApiKeyAuth | DigestAuth
+
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    def resolve_variables(
+        self, variables: list[Environment.Variable]
+    ) -> AuthPreset:
+        def _resolve_variables(value: str) -> str:
+            resolved_value = value
+            for variable in variables:
+                if not variable.enabled:
+                    continue
+
+                resolved_value = resolved_value.replace(
+                    '{{' + variable.key + '}}', variable.value
+                )
+                resolved_value = resolved_value.replace(
+                    '${' + variable.key + '}', variable.value
+                )
+            return resolved_value
+
+        if self.auth_mode == AuthMode.BASIC:
+            self.auth = self.BasicAuth(
+                username=_resolve_variables(self.auth.username),
+                password=_resolve_variables(self.auth.password),
+            )
+        elif self.auth_mode == AuthMode.BEARER:
+            self.auth = self.BearerAuth(
+                token=_resolve_variables(self.auth.token)
+            )
+        elif self.auth_mode == AuthMode.API_KEY:
+            self.auth = self.ApiKeyAuth(
+                key=_resolve_variables(self.auth.key),
+                value=_resolve_variables(self.auth.value),
+                where=self.where,
+            )
+        elif self.auth_mode == AuthMode.DIGEST:
+            self.auth = self.DigestAuth(
+                username=_resolve_variables(self.auth.username),
+                password=_resolve_variables(self.auth.password),
+            )
+
+        return self.model_copy(update=dict(auth=self.auth))
+
+    def to_httpx_auth(self) -> httpx.Auth | None:
+        if self.auth_mode == AuthMode.BASIC:
+            return httpx.BasicAuth(
+                username=self.auth.username, password=self.auth.password
+            )
+        elif self.auth_mode == AuthMode.BEARER:
+            return httpx_auths.BearerAuth(token=self.auth.token)
+        elif self.auth_mode == AuthMode.API_KEY:
+            if self.auth.where == 'header':
+                return httpx_auths.APIKeyHeaderAuth(
+                    key=self.auth.key, value=self.auth.value
+                )
+            elif self.auth.where == 'param':
+                return httpx_auths.APIKeyParamAuth(
+                    key=self.auth.key, value=self.auth.value
+                )
+        elif self.auth_mode == AuthMode.DIGEST:
+            return httpx.DigestAuth(
+                username=self.auth.username, password=self.auth.password
+            )

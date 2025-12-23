@@ -1,0 +1,18 @@
+CREATE TABLE auth_presets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+  name TEXT NOT NULL UNIQUE,
+  auth_mode TEXT NOT NULL,
+  auth JSON NOT NULL,
+
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL
+);
+
+
+ALTER TABLE requests DROP COLUMN auth_mode;
+
+ALTER TABLE requests DROP COLUMN auth;
+
+ALTER TABLE requests ADD COLUMN  auth_id INTEGER NULL
+  REFERENCES auth_presets(id) ON DELETE SET NULL;

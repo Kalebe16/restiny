@@ -19,14 +19,14 @@ from restiny.assets import STYLE_TCSS
 from restiny.consts import CUSTOM_THEMES
 from restiny.data.db import DBManager
 from restiny.data.repos import (
+    AuthPresetsSQLRepo,
     EnvironmentsSQLRepo,
     FoldersSQLRepo,
     RequestsSQLRepo,
     SettingsSQLRepo,
 )
-from restiny.entities import Request
+from restiny.entities import AuthPreset, Environment, Request
 from restiny.enums import (
-    AuthMode,
     BodyMode,
     BodyRawLanguage,
     ContentType,
@@ -38,6 +38,7 @@ from restiny.ui import (
     TopBarArea,
     URLArea,
 )
+from restiny.ui.screens.auth_presets_screen import AuthPresetsScreen
 from restiny.ui.screens.environments_screen import EnvironmentsScreen
 from restiny.ui.screens.openapi_spec_import_screen import (
     OpenapiSpecImportScreen,
@@ -105,6 +106,7 @@ class RESTinyApp(App, inherit_bindings=False):
         requests_repo: RequestsSQLRepo,
         settings_repo: SettingsSQLRepo,
         environments_repo: EnvironmentsSQLRepo,
+        auth_presets_repo: AuthPresetsSQLRepo,
         *args,
         **kwargs,
     ) -> None:
@@ -114,6 +116,7 @@ class RESTinyApp(App, inherit_bindings=False):
         self.requests_repo = requests_repo
         self.settings_repo = settings_repo
         self.environments_repo = environments_repo
+        self.auth_presets_repo = auth_presets_repo
 
         self._active_request_task: asyncio.Task | None = None
         self._last_focused_widget: Widget | None = None
@@ -162,6 +165,9 @@ class RESTinyApp(App, inherit_bindings=False):
             'Manage environments', None, self.manage_environments
         )
         yield SystemCommand('Manage settings', None, self.manage_settings)
+        yield SystemCommand(
+            'Manage auth presets', None, self.manage_auth_presets
+        )
         yield SystemCommand(
             'Import postman collection',
             None,
@@ -225,8 +231,8 @@ class RESTinyApp(App, inherit_bindings=False):
             )
             return
 
-        request = self.get_resolved_request()
-        self.copy_to_clipboard(request.to_curl())
+        request, auth = self.get_resolved_request_with_auth()
+        self.copy_to_clipboard(request.to_curl(auth=auth))
         self.notify(
             'CURL command copied to clipboard',
             severity='information',
@@ -250,6 +256,14 @@ class RESTinyApp(App, inherit_bindings=False):
 
         self.push_screen(
             screen=EnvironmentsScreen(), callback=on_manage_environments_result
+        )
+
+    def manage_auth_presets(self) -> None:
+        def on_manage_auth_presets_result(result) -> None:
+            pass
+
+        self.push_screen(
+            screen=AuthPresetsScreen(), callback=on_manage_auth_presets_result
         )
 
     def import_postman_collection(self) -> None:
@@ -424,28 +438,7 @@ class RESTinyApp(App, inherit_bindings=False):
         ]
 
         auth_enabled = self.request_area.auth_enabled
-        auth_mode = self.request_area.auth_mode
-        auth = None
-        if auth_mode == AuthMode.BASIC:
-            auth = Request.BasicAuth(
-                username=self.request_area.auth_basic_username,
-                password=self.request_area.auth_basic_password,
-            )
-        elif auth_mode == AuthMode.BEARER:
-            auth = Request.BearerAuth(
-                token=self.request_area.auth_bearer_token
-            )
-        elif auth_mode == AuthMode.API_KEY:
-            auth = Request.ApiKeyAuth(
-                key=self.request_area.auth_api_key_key,
-                value=self.request_area.auth_api_key_value,
-                where=self.request_area.auth_api_key_where,
-            )
-        elif auth_mode == AuthMode.DIGEST:
-            auth = Request.DigestAuth(
-                username=self.request_area.auth_digest_username,
-                password=self.request_area.auth_digest_password,
-            )
+        auth_id = self.request_area.auth_id
 
         body_enabled = self.request_area.body_enabled
         body_mode = self.request_area.body_mode
@@ -499,26 +492,40 @@ class RESTinyApp(App, inherit_bindings=False):
             body_mode=body_mode,
             body=body,
             auth_enabled=auth_enabled,
-            auth_mode=auth_mode,
-            auth=auth,
+            auth_id=auth_id,
             options=options,
         )
 
-    def get_resolved_request(self) -> Request:
+    def get_variables(self) -> list[Environment.Variable]:
+        variables: list[Environment.Variable] = []
+
         global_environment = self.environments_repo.get_by_name(
             name='global'
         ).data
-        resolved_global_environment = global_environment.resolve_variables()
-        request = self.get_request().resolve_variables(
-            resolved_global_environment.variables
-        )
+        variables.extend(global_environment.resolve_variables().variables)
+
         if self.top_bar_area.environment:
             environment = self.environments_repo.get_by_name(
                 name=self.top_bar_area.environment
             ).data
-            resolved_environment = environment.resolve_variables()
-            request = request.resolve_variables(resolved_environment.variables)
-        return request
+            variables.extend(environment.resolve_variables().variables)
+
+        return variables
+
+    def get_resolved_request_with_auth(
+        self,
+    ) -> tuple[Request, AuthPreset | None]:
+        variables = self.get_variables()
+        request = self.get_request().resolve_variables(variables=variables)
+
+        auth_preset: AuthPreset | None = None
+        if request.auth_enabled and request.auth_id:
+            auth_preset = self.auth_presets_repo.get_by_id(
+                id=request.auth_id
+            ).data
+            auth_preset = auth_preset.resolve_variables(variables=variables)
+
+        return request, auth_preset
 
     def set_request(self, request: Request) -> None:
         self.url_area.clear()
@@ -541,20 +548,7 @@ class RESTinyApp(App, inherit_bindings=False):
         ]
 
         self.request_area.auth_enabled = request.auth_enabled
-        self.request_area.auth_mode = request.auth_mode
-        if request.auth is not None:
-            if request.auth_mode == AuthMode.BASIC:
-                self.request_area.auth_basic_username = request.auth.username
-                self.request_area.auth_basic_password = request.auth.password
-            elif request.auth_mode == AuthMode.BEARER:
-                self.request_area.auth_bearer_token = request.auth.token
-            elif request.auth_mode == AuthMode.API_KEY:
-                self.request_area.auth_api_key_key = request.auth.key
-                self.request_area.auth_api_key_value = request.auth.value
-                self.request_area.auth_api_key_where = request.auth.where
-            elif request.auth_mode == AuthMode.DIGEST:
-                self.request_area.auth_digest_username = request.auth.username
-                self.request_area.auth_digest_password = request.auth.password
+        self.request_area.auth_id = request.auth_id
 
         self.request_area.body_enabled = request.body_enabled
         self.request_area.body_mode = request.body_mode
@@ -595,7 +589,7 @@ class RESTinyApp(App, inherit_bindings=False):
         self.response_area.loading = True
         self.url_area.request_pending = True
         try:
-            request = self.get_resolved_request()
+            request, auth = self.get_resolved_request_with_auth()
             async with httpx.AsyncClient(
                 timeout=request.options.timeout,
                 follow_redirects=request.options.follow_redirects,
@@ -603,7 +597,7 @@ class RESTinyApp(App, inherit_bindings=False):
             ) as http_client:
                 response = await http_client.send(
                     request=request.to_httpx_req(),
-                    auth=request.to_httpx_auth(),
+                    auth=auth.to_httpx_auth() if auth else None,
                 )
                 self._display_response(response=response)
                 self.response_area.is_showing_response = True

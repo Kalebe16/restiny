@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from textual import on
 from textual.app import ComposeResult
@@ -18,14 +21,18 @@ from restiny.widgets import (
     CustomInput,
     CustomTextArea,
     DynamicFields,
-    PasswordInput,
     PathChooser,
     TextDynamicField,
     TextOrFileDynamicField,
 )
 
+if TYPE_CHECKING:
+    from restiny.ui.app import RESTinyApp
+
 
 class RequestArea(Static):
+    app: RESTinyApp
+
     ALLOW_MAXIMIZE = True
     focusable = True
     BORDER_TITLE = 'Request'
@@ -55,70 +62,8 @@ class RequestArea(Static):
                 with Horizontal(classes='h-auto'):
                     yield Switch(tooltip='Enabled', id='auth-enabled')
                     yield Select(
-                        (
-                            ('Basic', AuthMode.BASIC),
-                            ('Bearer', AuthMode.BEARER),
-                            ('API Key', AuthMode.API_KEY),
-                            ('Digest', AuthMode.DIGEST),
-                        ),
-                        allow_blank=False,
-                        tooltip='Auth mode',
-                        id='auth-mode',
+                        (), allow_blank=True, tooltip='Auth Preset', id='auth'
                     )
-                with ContentSwitcher(
-                    initial='auth-basic', id='auth-mode-switcher'
-                ):
-                    with Horizontal(id='auth-basic', classes='mt-1'):
-                        yield CustomInput(
-                            placeholder='Username',
-                            select_on_focus=False,
-                            classes='w-1fr',
-                            id='auth-basic-username',
-                        )
-                        yield PasswordInput(
-                            placeholder='Password',
-                            select_on_focus=False,
-                            classes='w-2fr',
-                            id='auth-basic-password',
-                        )
-                    with Horizontal(id='auth-bearer', classes='mt-1'):
-                        yield PasswordInput(
-                            placeholder='Token',
-                            select_on_focus=False,
-                            id='auth-bearer-token',
-                        )
-                    with Horizontal(id='auth-api-key', classes='mt-1'):
-                        yield Select(
-                            (('Header', 'header'), ('Param', 'param')),
-                            allow_blank=False,
-                            tooltip='Where',
-                            classes='w-1fr',
-                            id='auth-api-key-where',
-                        )
-                        yield CustomInput(
-                            placeholder='Key',
-                            classes='w-2fr',
-                            id='auth-api-key-key',
-                        )
-                        yield PasswordInput(
-                            placeholder='Value',
-                            classes='w-3fr',
-                            id='auth-api-key-value',
-                        )
-
-                    with Horizontal(id='auth-digest', classes='mt-1'):
-                        yield CustomInput(
-                            placeholder='Username',
-                            select_on_focus=False,
-                            classes='w-1fr',
-                            id='auth-digest-username',
-                        )
-                        yield PasswordInput(
-                            placeholder='Password',
-                            select_on_focus=False,
-                            classes='w-2fr',
-                            id='auth-digest-password',
-                        )
 
             with TabPane('Body'):
                 with Horizontal(classes='h-auto'):
@@ -207,34 +152,7 @@ class RequestArea(Static):
         self.param_fields = self.query_one('#params', DynamicFields)
 
         self.auth_enabled_switch = self.query_one('#auth-enabled', Switch)
-        self.auth_mode_switcher = self.query_one(
-            '#auth-mode-switcher', ContentSwitcher
-        )
-        self.auth_mode_select = self.query_one('#auth-mode', Select)
-        self.auth_basic_username_input = self.query_one(
-            '#auth-basic-username', CustomInput
-        )
-        self.auth_basic_password_input = self.query_one(
-            '#auth-basic-password', PasswordInput
-        )
-        self.auth_bearer_token_input = self.query_one(
-            '#auth-bearer-token', PasswordInput
-        )
-        self.auth_api_key_key_input = self.query_one(
-            '#auth-api-key-key', CustomInput
-        )
-        self.auth_api_key_value_input = self.query_one(
-            '#auth-api-key-value', PasswordInput
-        )
-        self.auth_api_key_where_select = self.query_one(
-            '#auth-api-key-where', Select
-        )
-        self.auth_digest_username_input = self.query_one(
-            '#auth-digest-username', CustomInput
-        )
-        self.auth_digest_password_input = self.query_one(
-            '#auth-digest-password', PasswordInput
-        )
+        self.auth_id_select = self.query_one('#auth', Select)
 
         self.body_enabled_switch = self.query_one('#body-enabled', Switch)
         self.body_mode_select = self.query_one('#body-mode', Select)
@@ -262,6 +180,8 @@ class RequestArea(Static):
         self.options_verify_ssl_switch = self.query_one(
             '#options-verify-ssl', Switch
         )
+
+        self.populate_auths()
 
     @property
     def headers(self) -> list[dict[str, str | bool]]:
@@ -330,76 +250,18 @@ class RequestArea(Static):
         self.auth_enabled_switch.value = value
 
     @property
-    def auth_mode(self) -> AuthMode:
-        return self.auth_mode_select.value
+    def auth_id(self) -> str | None:
+        if self.auth_id_select.value == Select.BLANK:
+            return None
 
-    @auth_mode.setter
-    def auth_mode(self, value: AuthMode) -> None:
-        self.auth_mode_select.value = value
+        return self.auth_id_select.value
 
-    @property
-    def auth_basic_username(self) -> str:
-        return self.auth_basic_username_input.value
+    @auth_id.setter
+    def auth_id(self, value: int | str | None) -> None:
+        if value is None:
+            value = Select.BLANK
 
-    @auth_basic_username.setter
-    def auth_basic_username(self, value: str) -> None:
-        self.auth_basic_username_input.value = value
-
-    @property
-    def auth_basic_password(self) -> str:
-        return self.auth_basic_password_input.value
-
-    @auth_basic_password.setter
-    def auth_basic_password(self, value: str) -> None:
-        self.auth_basic_password_input.value = value
-
-    @property
-    def auth_bearer_token(self) -> str:
-        return self.auth_bearer_token_input.value
-
-    @auth_bearer_token.setter
-    def auth_bearer_token(self, value: str) -> None:
-        self.auth_bearer_token_input.value = value
-
-    @property
-    def auth_api_key_key(self) -> str:
-        return self.auth_api_key_key_input.value
-
-    @auth_api_key_key.setter
-    def auth_api_key_key(self, value: str) -> None:
-        self.auth_api_key_key_input.value = value
-
-    @property
-    def auth_api_key_value(self) -> str:
-        return self.auth_api_key_value_input.value
-
-    @auth_api_key_value.setter
-    def auth_api_key_value(self, value: str) -> None:
-        self.auth_api_key_value_input.value = value
-
-    @property
-    def auth_api_key_where(self) -> str:
-        return self.auth_api_key_where_select.value
-
-    @auth_api_key_where.setter
-    def auth_api_key_where(self, value: str) -> None:
-        self.auth_api_key_where_select.value = value
-
-    @property
-    def auth_digest_username(self) -> str:
-        return self.auth_digest_username_input.value
-
-    @auth_digest_username.setter
-    def auth_digest_username(self, value: str) -> None:
-        self.auth_digest_username_input.value = value
-
-    @property
-    def auth_digest_password(self) -> str:
-        return self.auth_digest_password_input.value
-
-    @auth_digest_password.setter
-    def auth_digest_password(self, value: str) -> None:
-        self.auth_digest_password_input.value = value
+        self.auth_id_select.value = value
 
     @property
     def body_enabled(self) -> bool:
@@ -584,3 +446,12 @@ class RequestArea(Static):
     @on(Select.Changed, '#body-raw-language')
     def _on_change_body_raw_language(self, message: Select.Changed) -> None:
         self.body_raw_editor.language = message.value
+
+    def populate_auths(self) -> None:
+        auth_presets = self.app.auth_presets_repo.get_all().data
+
+        auth_presets_options = []
+        for auth_preset in auth_presets:
+            auth_presets_options.append((auth_preset.name, auth_preset.id))
+
+        self.auth_id_select.set_options(auth_presets_options)

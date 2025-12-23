@@ -17,6 +17,7 @@ def run_app() -> None:
 
     from restiny.data.db import DBManager
     from restiny.data.repos import (
+        AuthPresetsSQLRepo,
         EnvironmentsSQLRepo,
         FoldersSQLRepo,
         RequestsSQLRepo,
@@ -32,6 +33,7 @@ def run_app() -> None:
         requests_repo=RequestsSQLRepo(db_manager=db_manager),
         settings_repo=SettingsSQLRepo(db_manager=db_manager),
         environments_repo=EnvironmentsSQLRepo(db_manager=db_manager),
+        auth_presets_repo=AuthPresetsSQLRepo(db_manager=db_manager),
     )
 
     if os.getenv('RESTINY_HEADLESS') == '1':

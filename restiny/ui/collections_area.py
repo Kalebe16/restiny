@@ -166,7 +166,9 @@ class CollectionsArea(Widget):
         folder_id = node.data['id']
 
         folders = self.app.folders_repo.get_by_parent_id(folder_id).data
-        requests = self.app.requests_repo.get_by_folder_id(folder_id).data
+        requests_resp = self.app.requests_repo.get_by_folder_id(folder_id)
+
+        requests = requests_resp.data
 
         def sort_requests(request: Request) -> tuple:
             methods = [method.value for method in HTTPMethod]

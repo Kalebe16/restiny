@@ -14,12 +14,13 @@ from sqlalchemy.orm import Session
 
 from restiny.data.db import DBManager
 from restiny.data.models import (
+    SQLAuthPreset,
     SQLEnvironment,
     SQLFolder,
     SQLRequest,
     SQLSettings,
 )
-from restiny.entities import Environment, Folder, Request, Settings
+from restiny.entities import AuthPreset, Environment, Folder, Request, Settings
 from restiny.logger import get_logger
 
 logger = get_logger()
@@ -279,8 +280,7 @@ class RequestsSQLRepo(SQLRepoBase):
             SQLRequest.body_mode.key,
             SQLRequest.body.key,
             SQLRequest.auth_enabled.key,
-            SQLRequest.auth_mode.key,
-            SQLRequest.auth.key,
+            SQLRequest.auth_id.key,
             SQLRequest.option_timeout.key,
             SQLRequest.option_follow_redirects.key,
             SQLRequest.option_verify_ssl.key,
@@ -299,8 +299,7 @@ class RequestsSQLRepo(SQLRepoBase):
             body_mode=sql_request.body_mode,
             body=json.loads(sql_request.body) if sql_request.body else None,
             auth_enabled=sql_request.auth_enabled,
-            auth_mode=sql_request.auth_mode,
-            auth=json.loads(sql_request.auth) if sql_request.auth else None,
+            auth_id=sql_request.auth_id,
             options=Request.Options(
                 timeout=sql_request.option_timeout,
                 follow_redirects=sql_request.option_follow_redirects,
@@ -329,10 +328,7 @@ class RequestsSQLRepo(SQLRepoBase):
             if request.body
             else None,
             auth_enabled=request.auth_enabled,
-            auth_mode=request.auth_mode,
-            auth=json.dumps(request.auth.model_dump(), default=str)
-            if request.auth
-            else None,
+            auth_id=request.auth_id,
             option_timeout=request.options.timeout,
             option_follow_redirects=request.options.follow_redirects,
             option_verify_ssl=request.options.verify_ssl,
@@ -505,4 +501,125 @@ class EnvironmentsSQLRepo(SQLRepoBase):
             ),
             created_at=environment.created_at,
             updated_at=environment.updated_at,
+        )
+
+
+class AuthPresetsSQLRepo(SQLRepoBase):
+    @safe_repo
+    def get_by_id(
+        self, id: int, session: Session | None = None
+    ) -> RepoResp[AuthPreset]:
+        with self._ensure_session(session) as session:
+            sql_auth_preset = session.get(SQLAuthPreset, id)
+
+            if not sql_auth_preset:
+                return RepoResp(status=RepoStatus.NOT_FOUND)
+
+            auth_preset = self._sql_to_auth_preset(sql_auth_preset)
+            return RepoResp(data=auth_preset)
+
+    @safe_repo
+    def get_by_name(
+        self, name: str, session: Session | None = None
+    ) -> RepoResp[AuthPreset]:
+        with self._ensure_session(session) as session:
+            sql_auth_preset = session.scalar(
+                select(SQLAuthPreset).where(SQLAuthPreset.name == name)
+            )
+
+            if not sql_auth_preset:
+                return RepoResp(status=RepoStatus.NOT_FOUND)
+
+            auth_preset = self._sql_to_auth_preset(sql_auth_preset)
+            return RepoResp(data=auth_preset)
+
+    @safe_repo
+    def get_all(
+        self, session: Session | None = None
+    ) -> RepoResp[list[AuthPreset]]:
+        with self._ensure_session(session) as session:
+            sql_auth_presets = session.scalars(
+                select(SQLAuthPreset).order_by(
+                    SQLAuthPreset.name.asc(),
+                )
+            )
+            auth_presets = [
+                self._sql_to_auth_preset(sql_env)
+                for sql_env in sql_auth_presets
+            ]
+            return RepoResp(data=auth_presets)
+
+    @safe_repo
+    def create(
+        self, auth_preset: AuthPreset, session: Session | None = None
+    ) -> RepoResp[AuthPreset]:
+        with self._ensure_session(session) as session:
+            sql_auth_preset = self._auth_preset_to_sql(auth_preset)
+            session.add(sql_auth_preset)
+            session.flush()
+            new_preset = self._sql_to_auth_preset(sql_auth_preset)
+            return RepoResp(data=new_preset)
+
+    @safe_repo
+    def update(
+        self, auth_preset: AuthPreset, session: Session | None = None
+    ) -> RepoResp[AuthPreset]:
+        with self._ensure_session(session) as session:
+            sql_auth_preset = session.get(SQLAuthPreset, auth_preset.id)
+            if not sql_auth_preset:
+                return RepoResp(status=RepoStatus.NOT_FOUND)
+
+            new_data = self._auth_preset_to_sql(auth_preset)
+            for field in self._updatable_sql_fields:
+                setattr(sql_auth_preset, field, getattr(new_data, field))
+
+            session.flush()
+
+            new_auth_preset = self._sql_to_auth_preset(sql_auth_preset)
+            return RepoResp(data=new_auth_preset)
+
+    @safe_repo
+    def delete_by_id(
+        self, id: int, session: Session | None = None
+    ) -> RepoResp[None]:
+        with self._ensure_session(session) as session:
+            sql_auth_preset = session.get(SQLAuthPreset, id)
+            if not sql_auth_preset:
+                return RepoResp(status=RepoStatus.NOT_FOUND)
+
+            session.delete(sql_auth_preset)
+            return RepoResp()
+
+    @property
+    def _updatable_sql_fields(self) -> list[str]:
+        return [
+            SQLAuthPreset.name.key,
+            SQLAuthPreset.auth_mode.key,
+            SQLAuthPreset.auth.key,
+        ]
+
+    def _sql_to_auth_preset(
+        self, sql_auth_preset: SQLAuthPreset
+    ) -> AuthPreset:
+        return AuthPreset(
+            id=sql_auth_preset.id,
+            name=sql_auth_preset.name,
+            auth_mode=sql_auth_preset.auth_mode,
+            auth=json.loads(sql_auth_preset.auth)
+            if sql_auth_preset.auth
+            else None,
+            created_at=sql_auth_preset.created_at.replace(tzinfo=UTC),
+            updated_at=sql_auth_preset.updated_at.replace(tzinfo=UTC),
+        )
+
+    def _auth_preset_to_sql(self, auth_preset: AuthPreset) -> SQLAuthPreset:
+        return SQLAuthPreset(
+            id=auth_preset.id,
+            name=auth_preset.name,
+            auth_mode=auth_preset.auth_mode,
+            auth=json.dumps(auth_preset.auth.model_dump(), default=str)
+            if auth_preset.auth
+            else None,
+            created_at=auth_preset.created_at,
+            updated_at=auth_preset.updated_at,
         )

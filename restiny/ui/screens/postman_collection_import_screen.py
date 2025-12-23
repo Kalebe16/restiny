@@ -10,7 +10,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button
 
-from restiny.entities import Folder, Request
+from restiny.entities import AuthPreset, Folder, Request
 from restiny.enums import AuthMode, BodyMode, BodyRawLanguage
 from restiny.logger import get_logger
 from restiny.widgets import PathChooser
@@ -275,6 +275,18 @@ class PostmanCollectionImportScreen(ModalScreen):
                                 password=auth_digest_password,
                             )
 
+                    if auth:
+                        create_auth_resp = self.app.auth_presets_repo.create(
+                            auth_preset=AuthPreset(
+                                name=f'{postman_item["name"]} auth',
+                                auth_mode=auth_mode,
+                                auth=auth,
+                            ),
+                            session=session,
+                        )
+                        if not create_auth_resp.ok:
+                            raise _ImportFailedError()
+
                     create_request_resp = self.app.requests_repo.create(
                         request=Request(
                             folder_id=parent_folder_id,
@@ -287,13 +299,13 @@ class PostmanCollectionImportScreen(ModalScreen):
                             body_mode=body_mode,
                             body=body,
                             auth_enabled=auth_enabled,
-                            auth_mode=auth_mode,
-                            auth=auth,
+                            auth_id=create_auth_resp.data.id if auth else None,
                         ),
                         session=session,
                     )
                     if not create_request_resp.ok:
                         raise _ImportFailedError()
+
                 elif is_folder:
                     create_folder_resp = self.app.folders_repo.create(
                         folder=Folder(
