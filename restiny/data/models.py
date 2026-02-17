@@ -76,6 +76,7 @@ class SQLSettings(SQLModelBase):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
     theme: Mapped[str] = mapped_column(nullable=False)
+    editor_theme: Mapped[str] = mapped_column(nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(),

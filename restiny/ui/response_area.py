@@ -28,8 +28,8 @@ class ResponseArea(Static):
         width: 1fr;
         height: 1fr;
         border: heavy black;
-        border-title-color: gray;
-        border-subtitle-color: gray;
+        border: heavy $panel;
+        border-title-color: $text-muted;
         padding: 1;
     }
 

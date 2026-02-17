@@ -28,8 +28,8 @@ class EnvironmentsScreen(ModalScreen):
     #modal-content {
         width: 70%;
         height: 80%;
-        border: heavy black;
-        border-title-color: gray;
+        border: heavy $panel;
+        border-title-color: $text-muted;
         background: $surface;
     }
 
