@@ -14,7 +14,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
 dependencies = [
-  "textual>=6.3,<6.4",
+  "textual>=8.0, <8.1",
   "textual[syntax]",
   "httpx>=0.28,<0.29",
   "pyperclip>=1.9,<1.10",

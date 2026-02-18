@@ -43,7 +43,7 @@ class TopBarArea(Widget):
 
     @property
     def environment(self) -> str:
-        if self.environment_select.value == Select.BLANK:
+        if self.environment_select.value == Select.NULL:
             return None
 
         return self.environment_select.value
