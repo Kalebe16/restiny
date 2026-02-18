@@ -61,8 +61,8 @@ class _BaseEditRequestOrFolderScreen(ModalScreen):
     }
 
     #modal-content {
-        border: heavy black;
-        border-title-color: gray;
+        border: heavy $panel;
+        border-title-color: $text-muted;
         background: $surface;
         width: auto;
         height: auto;

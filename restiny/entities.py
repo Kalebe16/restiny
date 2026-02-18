@@ -17,7 +17,6 @@ from restiny.enums import (
     BodyMode,
     BodyRawLanguage,
     ContentType,
-    CustomThemes,
     HTTPMethod,
 )
 from restiny.utils import build_curl_cmd
@@ -419,7 +418,8 @@ class Request(BaseModel):
 class Settings(BaseModel):
     id: int | None = None
 
-    theme: CustomThemes = CustomThemes.DARK
+    theme: str = 'textual-dark'
+    editor_theme: str = 'vscode_dark'
 
     created_at: datetime | None = None
     updated_at: datetime | None = None

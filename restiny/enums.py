@@ -44,9 +44,3 @@ class AuthMode(StrEnum):
     BEARER = 'bearer'
     API_KEY = 'api_key'
     DIGEST = 'digest'
-
-
-class CustomThemes(StrEnum):
-    DARK = 'dark'
-    DRACULA = 'dracula'
-    FOREST = 'forest'
