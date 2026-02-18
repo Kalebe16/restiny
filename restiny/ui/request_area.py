@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.widgets import (
+    Button,
     ContentSwitcher,
     Label,
+    Rule,
     Select,
     Static,
     Switch,
@@ -24,8 +29,13 @@ from restiny.widgets import (
     TextOrFileDynamicField,
 )
 
+if TYPE_CHECKING:
+    from restiny.ui.app import RESTinyApp
+
 
 class RequestArea(Static):
+    app: RESTinyApp
+
     ALLOW_MAXIMIZE = True
     focusable = True
     BORDER_TITLE = 'Request'
@@ -38,6 +48,10 @@ class RequestArea(Static):
         padding: 1;
     }
     """
+
+    def __init__(self, *args, **kwargs) -> None:
+        self._auth_clipboard: dict | None = None
+        super().__init__(*args, **kwargs)
 
     def compose(self) -> ComposeResult:
         with TabbedContent():
@@ -68,7 +82,7 @@ class RequestArea(Static):
                 with ContentSwitcher(
                     initial='auth-basic', id='auth-mode-switcher'
                 ):
-                    with Horizontal(id='auth-basic', classes='mt-1'):
+                    with Horizontal(id='auth-basic', classes='mt-1 h-auto'):
                         yield CustomInput(
                             placeholder='Username',
                             select_on_focus=False,
@@ -81,13 +95,13 @@ class RequestArea(Static):
                             classes='w-2fr',
                             id='auth-basic-password',
                         )
-                    with Horizontal(id='auth-bearer', classes='mt-1'):
+                    with Horizontal(id='auth-bearer', classes='mt-1 h-auto'):
                         yield PasswordInput(
                             placeholder='Token',
                             select_on_focus=False,
                             id='auth-bearer-token',
                         )
-                    with Horizontal(id='auth-api-key', classes='mt-1'):
+                    with Horizontal(id='auth-api-key', classes='mt-1 h-auto'):
                         yield Select(
                             (('Header', 'header'), ('Param', 'param')),
                             allow_blank=False,
@@ -106,7 +120,7 @@ class RequestArea(Static):
                             id='auth-api-key-value',
                         )
 
-                    with Horizontal(id='auth-digest', classes='mt-1'):
+                    with Horizontal(id='auth-digest', classes='mt-1 h-auto'):
                         yield CustomInput(
                             placeholder='Username',
                             select_on_focus=False,
@@ -119,6 +133,22 @@ class RequestArea(Static):
                             classes='w-2fr',
                             id='auth-digest-password',
                         )
+
+                yield Rule()
+
+                with Horizontal(classes='ml-1 h-auto'):
+                    yield Button(
+                        label='Copy',
+                        flat=True,
+                        tooltip='Copy auth',
+                        id='copy-auth',
+                    )
+                    yield Button(
+                        label='Paste',
+                        flat=True,
+                        tooltip='Paste auth',
+                        id='paste-auth',
+                    )
 
             with TabPane('Body'):
                 with Horizontal(classes='h-auto'):
@@ -235,6 +265,8 @@ class RequestArea(Static):
         self.auth_digest_password_input = self.query_one(
             '#auth-digest-password', PasswordInput
         )
+        self.copy_auth_button = self.query_one('#copy-auth', Button)
+        self.paste_auth_button = self.query_one('#paste-auth', Button)
 
         self.body_enabled_switch = self.query_one('#body-enabled', Switch)
         self.body_mode_select = self.query_one('#body-mode', Select)
@@ -584,3 +616,44 @@ class RequestArea(Static):
     @on(Select.Changed, '#body-raw-language')
     def _on_change_body_raw_language(self, message: Select.Changed) -> None:
         self.body_raw_editor.language = message.value
+
+    @on(Button.Pressed, '#copy-auth')
+    def _on_copy_auth(self, message: Button.Pressed) -> None:
+        self._auth_clipboard = {
+            'enabled': self.auth_enabled,
+            'mode': self.auth_mode,
+            'basic_username': self.auth_basic_username,
+            'basic_password': self.auth_basic_password,
+            'bearer_token': self.auth_bearer_token,
+            'api_key_where': self.auth_api_key_where,
+            'api_key_key': self.auth_api_key_key,
+            'api_key_value': self.auth_api_key_value,
+            'digest_username': self.auth_digest_username,
+            'digest_password': self.auth_digest_password,
+        }
+
+        self.app.notify('Auth copied')
+
+    @on(Button.Pressed, '#paste-auth')
+    def _on_paste_auth(self, message: Button.Pressed) -> None:
+        if not self._auth_clipboard:
+            self.app.notify('Nothing copied', severity='error')
+            return
+
+        self.auth_enabled_switch.value = self._auth_clipboard['enabled']
+        self.auth_mode_select.value = self._auth_clipboard['mode']
+
+        if self._auth_clipboard['mode'] == AuthMode.BASIC:
+            self.auth_basic_username = self._auth_clipboard['basic_username']
+            self.auth_basic_password = self._auth_clipboard['basic_password']
+        elif self._auth_clipboard['mode'] == AuthMode.BEARER:
+            self.auth_bearer_token = self._auth_clipboard['bearer_token']
+        elif self._auth_clipboard['mode'] == AuthMode.API_KEY:
+            self.auth_api_key_where = self._auth_clipboard['api_key_where']
+            self.auth_api_key_key = self._auth_clipboard['api_key_key']
+            self.auth_api_key_value = self._auth_clipboard['api_key_value']
+        elif self._auth_clipboard['mode'] == AuthMode.DIGEST:
+            self.auth_digest_username = self._auth_clipboard['digest_username']
+            self.auth_digest_password = self._auth_clipboard['digest_password']
+
+        self.app.notify('Auth pasted')
