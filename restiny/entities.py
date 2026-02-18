@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import mimetypes
 from datetime import datetime
 from pathlib import Path
@@ -258,19 +257,12 @@ class Request(BaseModel):
                 self.body.language, ContentType.TEXT
             )
 
-            raw = self.body.value
-            if headers['content-type'] == ContentType.JSON:
-                try:
-                    raw = json.dumps(raw)
-                except Exception:
-                    pass
-
             return httpx.Request(
                 method=self.method,
                 url=self.url,
                 headers=headers,
                 params=params,
-                content=raw,
+                content=self.body.value,
             )
         elif self.body_mode == BodyMode.FILE:
             file = self.body.file
