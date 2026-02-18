@@ -16,7 +16,6 @@ from textual.widgets import Footer, Header
 
 from restiny.__about__ import __version__
 from restiny.assets import STYLE_TCSS
-from restiny.consts import CUSTOM_THEMES
 from restiny.data.db import DBManager
 from restiny.data.repos import (
     EnvironmentsSQLRepo,
@@ -143,7 +142,6 @@ class RESTinyApp(App, inherit_bindings=False):
 
         self.selected_request = None
 
-        self._register_themes()
         self._apply_settings()
 
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
@@ -355,17 +353,13 @@ class RESTinyApp(App, inherit_bindings=False):
 
     def _apply_settings(self) -> None:
         settings = self.settings_repo.get().data
-        self.theme = settings.theme
+        self.call_later(lambda: setattr(self, 'theme', settings.theme))
         for text_area in self.query(CustomTextArea):
-            text_area.theme = settings.theme
-
-    def _register_themes(self) -> None:
-        for theme in CUSTOM_THEMES.values():
-            self.register_theme(theme=theme['global'])
-
-        for text_area in self.query(CustomTextArea):
-            for theme in CUSTOM_THEMES.values():
-                text_area.register_theme(theme=theme['text_area'])
+            self.call_later(
+                lambda ta=text_area: setattr(
+                    ta, 'theme', settings.editor_theme
+                )
+            )
 
     def _find_maximizable_area_by_widget(
         self, widget: Widget

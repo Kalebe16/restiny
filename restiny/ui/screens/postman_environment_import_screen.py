@@ -40,8 +40,8 @@ class PostmanEnvironmentImportScreen(ModalScreen):
     #modal-content {
         width: 30%;
         height: auto;
-        border: heavy black;
-        border-title-color: gray;
+        border: heavy $panel;
+        border-title-color: $text-muted;
         background: $surface;
     }
     """

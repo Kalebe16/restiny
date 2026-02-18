@@ -24,8 +24,8 @@ class PathChooserScreen(ModalScreen):
     }
 
     #modal-content {
-        border: heavy black;
-        border-title-color: gray;
+        border: heavy $panel;
+        border-title-color: $text-muted;
         background: $surface;
         width: 60%;
         height: 90%;
