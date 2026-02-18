@@ -60,6 +60,7 @@ jobs:
             --add-data "restiny/assets:assets" \
             --collect-data textual \
             --collect-submodules textual.widgets \
+            --collect-submodules rich._unicode_data \
             --collect-all tree_sitter \
             --collect-all tree_sitter_bash \
             --collect-all tree_sitter_css \
