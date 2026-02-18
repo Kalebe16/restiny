@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import mimetypes
 from datetime import datetime
 from pathlib import Path
@@ -17,7 +16,6 @@ from restiny.enums import (
     BodyMode,
     BodyRawLanguage,
     ContentType,
-    CustomThemes,
     HTTPMethod,
 )
 from restiny.utils import build_curl_cmd
@@ -259,19 +257,12 @@ class Request(BaseModel):
                 self.body.language, ContentType.TEXT
             )
 
-            raw = self.body.value
-            if headers['content-type'] == ContentType.JSON:
-                try:
-                    raw = json.dumps(raw)
-                except Exception:
-                    pass
-
             return httpx.Request(
                 method=self.method,
                 url=self.url,
                 headers=headers,
                 params=params,
-                content=raw,
+                content=self.body.value,
             )
         elif self.body_mode == BodyMode.FILE:
             file = self.body.file
@@ -419,7 +410,8 @@ class Request(BaseModel):
 class Settings(BaseModel):
     id: int | None = None
 
-    theme: CustomThemes = CustomThemes.DARK
+    theme: str = 'textual-dark'
+    editor_theme: str = 'vscode_dark'
 
     created_at: datetime | None = None
     updated_at: datetime | None = None

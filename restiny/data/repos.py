@@ -378,12 +378,13 @@ class SettingsSQLRepo(SQLRepoBase):
 
     @property
     def _updatable_sql_fields(self) -> list[str]:
-        return [SQLSettings.theme.key]
+        return [SQLSettings.theme.key, SQLSettings.editor_theme.key]
 
     def _sql_to_settings(self, sql_settings: SQLSettings) -> Settings:
         return Settings(
             id=sql_settings.id,
             theme=sql_settings.theme,
+            editor_theme=sql_settings.editor_theme,
             created_at=sql_settings.created_at.replace(tzinfo=UTC),
             updated_at=sql_settings.updated_at.replace(tzinfo=UTC),
         )
@@ -392,6 +393,7 @@ class SettingsSQLRepo(SQLRepoBase):
         return SQLSettings(
             id=settings.id,
             theme=settings.theme,
+            editor_theme=settings.editor_theme,
             created_at=settings.created_at,
             updated_at=settings.updated_at,
         )

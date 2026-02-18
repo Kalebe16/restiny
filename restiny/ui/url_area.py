@@ -16,8 +16,8 @@ class URLArea(Static):
     URLArea {
         width: 1fr;
         height: auto;
-        border: heavy black;
-        border-title-color: gray;
+        border: heavy $panel;
+        border-title-color: $text-muted;
     }
     """
 
