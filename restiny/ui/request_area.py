@@ -18,6 +18,7 @@ from textual.widgets import (
     TabPane,
 )
 
+from restiny.entities import Request
 from restiny.enums import AuthMode, BodyMode, BodyRawLanguage
 from restiny.widgets import (
     CustomInput,
@@ -148,6 +149,19 @@ class RequestArea(Static):
                         flat=True,
                         tooltip='Paste auth',
                         id='paste-auth',
+                    )
+                with Horizontal(classes='ml-1 h-auto'):
+                    yield Button(
+                        label='Apply to folder',
+                        flat=True,
+                        tooltip='Apply to all requests in this folder',
+                        id='apply-to-folder',
+                    )
+                    yield Button(
+                        label='Apply to collection',
+                        flat=True,
+                        tooltip='Apply to all requests in this collection',
+                        id='apply-to-collection',
                     )
 
             with TabPane('Body'):
@@ -671,3 +685,92 @@ class RequestArea(Static):
             ]
 
         self.app.notify('Auth pasted')
+
+    @on(Button.Pressed, '#apply-to-folder')
+    def _on_apply_to_folder(self, message: Button.Pressed) -> None:
+        requests = self.app.requests_repo.get_by_folder_id(
+            self.app.selected_request.folder_id
+        ).data
+
+        auth = None
+        if self.auth_mode == AuthMode.BASIC:
+            auth = Request.BasicAuth(
+                username=self.auth_basic_username,
+                password=self.auth_basic_password,
+            )
+        elif self.auth_mode == AuthMode.BEARER:
+            auth = Request.BearerAuth(
+                token=self.auth_bearer_token,
+            )
+        elif self.auth_mode == AuthMode.API_KEY:
+            auth = Request.ApiKeyAuth(
+                key=self.auth_api_key_key,
+                value=self.auth_api_key_value,
+                where=self.auth_api_key_where,
+            )
+        elif self.auth_mode == AuthMode.DIGEST:
+            auth = Request.DigestAuth(
+                username=self.auth_digest_username,
+                password=self.auth_digest_password,
+            )
+
+        for request in requests:
+            self.app.requests_repo.update(
+                request=request.model_copy(
+                    update=dict(
+                        auth_enabled=self.auth_enabled,
+                        auth_mode=self.auth_mode,
+                        auth=auth,
+                    )
+                )
+            )
+
+        self.app.notify('Auth applied to all requests in folder')
+
+    @on(Button.Pressed, '#apply-to-collection')
+    def _on_apply_to_collection(self, message: Button.Pressed) -> None:
+        folder_id = self.app.selected_request.folder_id
+        while True:
+            folder = self.app.folders_repo.get_by_id(folder_id).data
+            if folder.parent_id is None:
+                root_folder_id = folder.id
+                break
+            folder_id = folder.parent_id
+
+        requests = self.app.requests_repo.get_by_collection_id(
+            root_folder_id
+        ).data
+
+        auth = None
+        if self.auth_enabled:
+            if self.auth_mode == AuthMode.BASIC:
+                auth = Request.BasicAuth(
+                    username=self.auth_basic_username,
+                    password=self.auth_basic_password,
+                )
+            elif self.auth_mode == AuthMode.BEARER:
+                auth = Request.BearerAuth(token=self.auth_bearer_token)
+            elif self.auth_mode == AuthMode.API_KEY:
+                auth = Request.ApiKeyAuth(
+                    key=self.auth_api_key_key,
+                    value=self.auth_api_key_value,
+                    where=self.auth_api_key_where,
+                )
+            elif self.auth_mode == AuthMode.DIGEST:
+                auth = Request.DigestAuth(
+                    username=self.auth_digest_username,
+                    password=self.auth_digest_password,
+                )
+
+        for request in requests:
+            self.app.requests_repo.update(
+                request=request.model_copy(
+                    update=dict(
+                        auth_enabled=self.auth_enabled,
+                        auth_mode=self.auth_mode,
+                        auth=auth,
+                    )
+                )
+            )
+
+        self.app.notify('Auth applied to all requests in collection')

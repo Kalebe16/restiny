@@ -213,6 +213,32 @@ class RequestsSQLRepo(SQLRepoBase):
             return RepoResp(data=requests)
 
     @safe_repo
+    def get_by_collection_id(
+        self, collection_id: int, session: Session | None = None
+    ) -> RepoResp[list[Request]]:
+        with self._ensure_session(session) as session:
+            folder_tree = (
+                select(SQLFolder.id)
+                .where(SQLFolder.id == collection_id)
+                .cte(name='folder_tree', recursive=True)
+            )
+
+            folder_tree = folder_tree.union_all(
+                select(SQLFolder.id).where(
+                    SQLFolder.parent_id == folder_tree.c.id
+                )
+            )
+
+            sql_requests = session.scalars(
+                select(SQLRequest)
+                .where(SQLRequest.folder_id.in_(select(folder_tree.c.id)))
+                .order_by(SQLRequest.name.asc())
+            ).all()
+
+            requests = [self._sql_to_request(r) for r in sql_requests]
+            return RepoResp(data=requests)
+
+    @safe_repo
     def get_by_id(
         self, id: int, session: Session | None = None
     ) -> RepoResp[Request]:
