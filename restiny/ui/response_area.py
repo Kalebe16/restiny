@@ -1,5 +1,6 @@
 import re
 from http import HTTPStatus
+from typing import Union
 
 from textual import on
 from textual.app import ComposeResult
@@ -89,7 +90,7 @@ class ResponseArea(Static):
         self.headers_data_table.add_columns('Key', 'Value')
 
     @property
-    def status(self) -> HTTPStatus | None:
+    def status(self) -> Union[HTTPStatus, None]:
         match = re.match(self._title_regex, self.border_title)
         if match:
             return HTTPStatus(int(match['code']))
@@ -102,7 +103,7 @@ class ResponseArea(Static):
         )
 
     @property
-    def content_size(self) -> int | None:
+    def content_size(self) -> Union[int, None]:
         match = re.match(self._subtitle_regex, self.border_subtitle)
         if match:
             return int(match['content_size'])
@@ -119,7 +120,7 @@ class ResponseArea(Static):
         self.border_subtitle = f'{value} bytes in {elapsed_time} seconds'
 
     @property
-    def elapsed_time(self) -> float | None:
+    def elapsed_time(self) -> Union[float, None]:
         match = re.match(self._subtitle_regex, self.border_subtitle)
         if match:
             return float(match['elapsed_time'])

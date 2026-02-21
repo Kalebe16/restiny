@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, Union
 
 from textual import on
 from textual.app import ComposeResult
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 @dataclass
 class AddFolderResult:
     id: int
-    parent_id: int | None
+    parent_id: Union[int, None]
     name: str
 
 
@@ -41,8 +41,8 @@ class AddRequestResult:
 @dataclass
 class UpdateFolderResult:
     id: int
-    parent_id: int | None
-    old_parent_id: int | None
+    parent_id: Union[int, None]
+    old_parent_id: Union[int, None]
     name: str
 
 
@@ -88,8 +88,8 @@ class _BaseEditRequestOrFolderScreen(ModalScreen):
         self,
         kind: Literal['request', 'folder'] = 'request',
         name: str = '',
-        parents: list[tuple[str, int | None]] = [],
-        parent_id: int | None = None,
+        parents: list[tuple[str, Union[int, None]]] = [],
+        parent_id: Union[int, None] = None,
     ) -> None:
         super().__init__()
         self._kind = kind
@@ -148,7 +148,7 @@ class _BaseEditRequestOrFolderScreen(ModalScreen):
     def _common_validation(self) -> bool:
         kind: str = self.kind_radio_set.pressed_button.label
         name: str = self.name_input.value
-        parent_id: int | None = self.parent_select.value
+        parent_id: Union[int, None] = self.parent_select.value
 
         if not name:
             self.app.notify('Name is required', severity='error')
@@ -173,7 +173,7 @@ class AddRequestOrFolderScreen(_BaseEditRequestOrFolderScreen):
 
         kind: str = self.kind_radio_set.pressed_button.label
         name: str = self.name_input.value
-        parent_id: int | None = self.parent_select.value
+        parent_id: Union[int, None] = self.parent_select.value
 
         if kind == 'folder':
             resp = self.app.folders_repo.create(
@@ -230,8 +230,8 @@ class UpdateRequestOrFolderScreen(_BaseEditRequestOrFolderScreen):
 
         kind: str = self.kind_radio_set.pressed_button.label
         name: str = self.name_input.value
-        parent_id: int | None = self.parent_select.value
-        old_parent_id: int | None = self._parent_id
+        parent_id: Union[int, None] = self.parent_select.value
+        old_parent_id: Union[int, None] = self._parent_id
 
         if kind == 'folder':
             folder = self.app.folders_repo.get_by_id(id=self._id).data

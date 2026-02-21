@@ -1,8 +1,8 @@
-from enum import StrEnum
+from enum import Enum
 
 
 # TODO: Use http.HTTPMethod
-class HTTPMethod(StrEnum):
+class HTTPMethod(str, Enum):
     GET = 'GET'
     POST = 'POST'
     PUT = 'PUT'
@@ -14,14 +14,14 @@ class HTTPMethod(StrEnum):
     TRACE = 'TRACE'
 
 
-class BodyMode(StrEnum):
+class BodyMode(str, Enum):
     RAW = 'raw'
     FILE = 'file'
     FORM_URLENCODED = 'form_urlencoded'
     FORM_MULTIPART = 'form_multipart'
 
 
-class BodyRawLanguage(StrEnum):
+class BodyRawLanguage(str, Enum):
     PLAIN = ''
     HTML = 'html'
     JSON = 'json'
@@ -29,7 +29,7 @@ class BodyRawLanguage(StrEnum):
     XML = 'xml'
 
 
-class ContentType(StrEnum):
+class ContentType(str, Enum):
     TEXT = 'text/plain'
     HTML = 'text/html'
     JSON = 'application/json'
@@ -39,7 +39,7 @@ class ContentType(StrEnum):
     FORM_MULTIPART = 'multipart/form-data'
 
 
-class AuthMode(StrEnum):
+class AuthMode(str, Enum):
     BASIC = 'basic'
     BEARER = 'bearer'
     API_KEY = 'api_key'

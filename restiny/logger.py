@@ -1,10 +1,11 @@
 import time
 from logging import DEBUG, Formatter, Logger, getLogger
 from logging.handlers import RotatingFileHandler
+from typing import Union
 
 from restiny.consts import LOG_FILE
 
-_logger: Logger | None = None
+_logger: Union[Logger, None] = None
 
 
 def _setup_logger() -> Logger:

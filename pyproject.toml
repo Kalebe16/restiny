@@ -67,11 +67,11 @@ restiny = ["assets/**/*", "data/sql/**/*"]
 ##########
 [tool.ruff]
 line-length = 79
-target-version = "py311"
+target-version = "py39"
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "I", "UP"]
-ignore = ["E501", "B006", "UP037"]
+ignore = ["E501", "B006", "UP037", "UP017", "UP007"]
 
 [tool.ruff.format]
 quote-style = "single"

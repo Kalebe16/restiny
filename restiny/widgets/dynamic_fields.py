@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from enum import StrEnum
+from enum import Enum
 from pathlib import Path
+from typing import Union
 
 from textual import on
 from textual.app import ComposeResult
@@ -43,11 +44,11 @@ class DynamicField(Widget):
 
     @property
     @abstractmethod
-    def value(self) -> str | Path | None: ...
+    def value(self) -> Union[str, Path, None]: ...
 
     @value.setter
     @abstractmethod
-    def value(self, value: str | Path | None) -> None: ...
+    def value(self, value: Union[str, Path, None]) -> None: ...
 
     @property
     @abstractmethod
@@ -226,7 +227,7 @@ class TextDynamicField(DynamicField):
         self.post_message(self.RemoveRequested(field=self))
 
 
-class _ValueKind(StrEnum):
+class _ValueKind(str, Enum):
     TEXT = 'text'
     FILE = 'file'
 
@@ -254,7 +255,7 @@ class TextOrFileDynamicField(DynamicField):
         self,
         enabled: bool = False,
         key: str = '',
-        value: str | Path | None = '',
+        value: Union[str, Path, None] = '',
         value_kind: _ValueKind = _ValueKind.TEXT,
         *args,
         **kwargs,
@@ -345,14 +346,14 @@ class TextOrFileDynamicField(DynamicField):
         self.key_input.value = value
 
     @property
-    def value(self) -> str | Path | None:
+    def value(self) -> Union[str, Path, None]:
         if self.value_kind == _ValueKind.TEXT:
             return self.value_text_input.value
         elif self.value_kind == _ValueKind.FILE:
             return self.value_file_input.path
 
     @value.setter
-    def value(self, value: str | Path | None) -> None:
+    def value(self, value: Union[str, Path, None]) -> None:
         if isinstance(value, str):
             self.value_text_input.value = value
         elif isinstance(value, Path) or value is None:
@@ -407,7 +408,7 @@ class TextOrFileDynamicField(DynamicField):
     @on(CustomInput.Changed, '#value-text')
     @on(PathChooser.Changed, '#value-file')
     def on_input_changed(
-        self, message: CustomInput.Changed | PathChooser.Changed
+        self, message: Union[CustomInput.Changed, PathChooser.Changed]
     ) -> None:
         if self.is_empty:
             self.post_message(message=self.Empty(field=self))
