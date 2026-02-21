@@ -3,7 +3,7 @@ from __future__ import annotations
 import mimetypes
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Union
 
 import httpx
 from pydantic import BaseModel, field_validator
@@ -22,13 +22,13 @@ from restiny.utils import build_curl_cmd
 
 
 class Folder(BaseModel):
-    id: int | None = None
+    id: Union[int, None] = None
 
     name: str
-    parent_id: int | None = None
+    parent_id: Union[int, None] = None
 
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    created_at: Union[datetime, None] = None
+    updated_at: Union[datetime, None] = None
 
 
 class Request(BaseModel):
@@ -47,7 +47,7 @@ class Request(BaseModel):
         value: str
 
     class FileBody(BaseModel):
-        file: Path | None
+        file: Union[Path, None]
 
     class UrlEncodedFormBody(BaseModel):
         class Field(BaseModel):
@@ -62,7 +62,7 @@ class Request(BaseModel):
             value_kind: Literal['text', 'file']
             enabled: bool
             key: str
-            value: str | Path | None
+            value: Union[str, Path, None]
 
             @field_validator('value', mode='before')
             @classmethod
@@ -99,7 +99,7 @@ class Request(BaseModel):
         follow_redirects: bool = True
         verify_ssl: bool = True
 
-    id: int | None = None
+    id: Union[int, None] = None
 
     folder_id: int
     name: str
@@ -111,18 +111,18 @@ class Request(BaseModel):
 
     body_enabled: bool = False
     body_mode: str = BodyMode.RAW
-    body: (
-        RawBody | FileBody | UrlEncodedFormBody | MultipartFormBody | None
-    ) = None
+    body: Union[
+        RawBody, FileBody, UrlEncodedFormBody, MultipartFormBody, None
+    ] = None
 
     auth_enabled: bool = False
     auth_mode: AuthMode = AuthMode.BASIC
-    auth: BasicAuth | BearerAuth | ApiKeyAuth | DigestAuth | None = None
+    auth: Union[BasicAuth, BearerAuth, ApiKeyAuth, DigestAuth, None] = None
 
     options: Options = _Field(default_factory=Options)
 
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    created_at: Union[datetime, None] = None
+    updated_at: Union[datetime, None] = None
 
     def resolve_variables(
         self, variables: list[Environment.Variable]
@@ -316,7 +316,7 @@ class Request(BaseModel):
                 files=form_multipart_files,
             )
 
-    def to_httpx_auth(self) -> httpx.Auth | None:
+    def to_httpx_auth(self) -> Union[httpx.Auth, None]:
         if not self.auth_enabled:
             return
 
@@ -408,13 +408,13 @@ class Request(BaseModel):
 
 
 class Settings(BaseModel):
-    id: int | None = None
+    id: Union[int, None] = None
 
     theme: str = 'textual-dark'
     editor_theme: str = 'vscode_dark'
 
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    created_at: Union[datetime, None] = None
+    updated_at: Union[datetime, None] = None
 
 
 class Environment(BaseModel):
@@ -423,13 +423,13 @@ class Environment(BaseModel):
         key: str
         value: str
 
-    id: int | None = None
+    id: Union[int, None] = None
 
     name: str
     variables: list[Variable] = _Field(default_factory=list)
 
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    created_at: Union[datetime, None] = None
+    updated_at: Union[datetime, None] = None
 
     def resolve_variables(self) -> Environment:
         var_key_to_var_value: dict[str, str] = {

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, Union
 
 import yaml
 from textual import on
@@ -194,9 +194,9 @@ class OpenapiSpecImportScreen(ModalScreen):
                 url = base_url + path
 
                 for method, operation in methods.items():
-                    form_data_kind: (
-                        Literal['urlencoded', 'multipart'] | None
-                    ) = None
+                    form_data_kind: Union[
+                        Literal['urlencoded', 'multipart'], None
+                    ] = None
                     if all(
                         parameter.get('type') == 'string'
                         for parameter in operation.get('parameters', [])
@@ -213,8 +213,10 @@ class OpenapiSpecImportScreen(ModalScreen):
                     headers: list[Request.Header] = []
                     params: list[Request.Param] = []
                     form_data_fields: list[
-                        Request.MultipartFormBody.Field
-                        | Request.UrlEncodedFormBody.Field
+                        Union[
+                            Request.MultipartFormBody.Field,
+                            Request.UrlEncodedFormBody.Field,
+                        ]
                     ] = []
                     body_enabled = False
                     body_mode = BodyMode.RAW
@@ -537,7 +539,7 @@ class OpenapiSpecImportScreen(ModalScreen):
         elif schema_type == 'string':
             fmt = schema.get('format')
             if fmt == 'date-time':
-                return datetime.now(UTC).isoformat()
+                return datetime.now(timezone.utc).isoformat()
             elif fmt == 'date':
                 return date.today().isoformat()
             elif fmt == 'uuid':

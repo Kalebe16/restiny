@@ -1,3 +1,5 @@
+from typing import Union
+
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal
@@ -117,7 +119,7 @@ class URLArea(Static):
     @on(Button.Pressed, '#send-request')
     @on(CustomInput.Submitted, '#url')
     def _on_send_request(
-        self, message: Button.Pressed | CustomInput.Submitted
+        self, message: Union[Button.Pressed, CustomInput.Submitted]
     ) -> None:
         if self.request_pending:
             return

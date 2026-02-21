@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Union
 
 from sqlalchemy import DateTime, ForeignKey, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -13,7 +14,7 @@ class SQLFolder(SQLModelBase):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(nullable=False)
-    parent_id: Mapped[int | None] = mapped_column(
+    parent_id: Mapped[Union[int, None]] = mapped_column(
         ForeignKey('folders.id'), nullable=True
     )
 
@@ -41,19 +42,19 @@ class SQLRequest(SQLModelBase):
     name: Mapped[str] = mapped_column(nullable=False)
 
     method: Mapped[str] = mapped_column(nullable=False)
-    url: Mapped[str | None] = mapped_column(nullable=True)
-    headers: Mapped[str | None] = mapped_column(nullable=True)
-    params: Mapped[str | None] = mapped_column(nullable=True)
+    url: Mapped[Union[str, None]] = mapped_column(nullable=True)
+    headers: Mapped[Union[str, None]] = mapped_column(nullable=True)
+    params: Mapped[Union[str, None]] = mapped_column(nullable=True)
 
     body_enabled: Mapped[bool] = mapped_column(nullable=False)
     body_mode: Mapped[str] = mapped_column(nullable=False)
-    body: Mapped[str | None] = mapped_column(nullable=True)
+    body: Mapped[Union[str, None]] = mapped_column(nullable=True)
 
     auth_enabled: Mapped[bool] = mapped_column(nullable=False)
     auth_mode: Mapped[str] = mapped_column(nullable=False)
-    auth: Mapped[str | None] = mapped_column(nullable=True)
+    auth: Mapped[Union[str, None]] = mapped_column(nullable=True)
 
-    option_timeout: Mapped[float | None] = mapped_column(nullable=True)
+    option_timeout: Mapped[Union[float, None]] = mapped_column(nullable=True)
     option_follow_redirects: Mapped[bool] = mapped_column(nullable=False)
     option_verify_ssl: Mapped[bool] = mapped_column(nullable=False)
 

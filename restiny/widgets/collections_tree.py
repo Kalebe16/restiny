@@ -1,3 +1,5 @@
+from typing import Union
+
 from textual.widgets import Tree
 from textual.widgets.tree import TreeNode
 
@@ -9,7 +11,7 @@ class CollectionsTree(Tree):
     guide_depth = 3
 
     def on_mount(self) -> None:
-        self.node_by_id: dict[int | None, TreeNode] = {}
+        self.node_by_id: dict[Union[int, None], TreeNode] = {}
         self.node_by_id[None] = self.root
         self.root.data = {'name': '/', 'id': None}
 
@@ -31,7 +33,7 @@ class CollectionsTree(Tree):
             return self.cursor_node.parent
 
     def add_folder(
-        self, parent_node: TreeNode | None, name: str, id: int
+        self, parent_node: Union[TreeNode, None], name: str, id: int
     ) -> TreeNode:
         parent_node = parent_node or self.root
 
@@ -44,7 +46,11 @@ class CollectionsTree(Tree):
         return node
 
     def add_request(
-        self, parent_node: TreeNode | None, method: str, name: str, id: int
+        self,
+        parent_node: Union[TreeNode, None],
+        method: str,
+        name: str,
+        id: int,
     ) -> TreeNode:
         parent_node = parent_node or self.root
 

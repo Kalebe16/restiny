@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from textual import on
 from textual.app import ComposeResult
@@ -217,7 +217,7 @@ class CollectionsArea(Widget):
             )
 
     def _on_prompt_add_result(
-        self, result: AddFolderResult | AddRequestResult | None
+        self, result: Union[AddFolderResult, AddRequestResult, None]
     ) -> None:
         if result is None:
             return
@@ -234,7 +234,7 @@ class CollectionsArea(Widget):
             self.post_message(message=self.FolderAdded(folder_id=result.id))
 
     def _on_prompt_update_result(
-        self, result: UpdateFolderResult | UpdateRequestResult | None
+        self, result: Union[UpdateFolderResult, UpdateRequestResult, None]
     ) -> None:
         if result is None:
             return
@@ -318,10 +318,14 @@ class CollectionsArea(Widget):
             lambda: self.collections_tree.select_node(next_node_to_select)
         )
 
-    def _resolve_all_folder_paths(self) -> list[dict[str, str | int | None]]:
-        paths: list[dict[str, str | int | None]] = [{'path': '/', 'id': None}]
+    def _resolve_all_folder_paths(
+        self,
+    ) -> list[dict[str, Union[str, int, None]]]:
+        paths: list[dict[str, Union[str, int, None]]] = [
+            {'path': '/', 'id': None}
+        ]
 
-        paths_stack: list[tuple[str, int | None]] = [('/', None)]
+        paths_stack: list[tuple[str, Union[int, None]]] = [('/', None)]
         while paths_stack:
             parent_path, parent_id = paths_stack.pop(0)
 

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import Enum
 from pathlib import Path
+from typing import Union
 
 from textual import on
 from textual.app import ComposeResult
@@ -41,7 +42,7 @@ class PathChooserScreen(ModalScreen):
     ]
     show_hidden_files: reactive[bool] = reactive(False, init=False)
     show_hidden_dirs: reactive[bool] = reactive(False, init=False)
-    allowed_file_suffixes: reactive[list[str] | None] = reactive(
+    allowed_file_suffixes: reactive[Union[list[str], None]] = reactive(
         None, init=False
     )
 
@@ -120,8 +121,10 @@ class PathChooserScreen(ModalScreen):
     @on(CustomDirectoryTree.DirectorySelected)
     def on_path_selected(
         self,
-        message: CustomDirectoryTree.FileSelected
-        | CustomDirectoryTree.DirectorySelected,
+        message: Union[
+            CustomDirectoryTree.FileSelected,
+            CustomDirectoryTree.DirectorySelected,
+        ],
     ) -> None:
         self.input.value = str(message.path)
         self.input.tooltip = str(message.path)
@@ -135,7 +138,7 @@ class PathChooserScreen(ModalScreen):
         await self.directory_tree.reload()
 
     async def watch_allowed_file_suffixes(
-        self, value: list[str] | None
+        self, value: Union[list[str], None]
     ) -> None:
         self._apply_filter_paths()
         await self.directory_tree.reload()
@@ -148,12 +151,14 @@ class PathChooserScreen(ModalScreen):
             allowed_file_suffixes=self.allowed_file_suffixes,
         )
 
-    def validate_selected_path(self, path: Path | None) -> bool:
+    def validate_selected_path(self, path: Union[Path, None]) -> bool:
         raise NotImplementedError()
 
 
 class FileChooserScreen(PathChooserScreen):
-    def __init__(self, allowed_file_suffixes: list[str] | None = None) -> None:
+    def __init__(
+        self, allowed_file_suffixes: Union[list[str], None] = None
+    ) -> None:
         super().__init__()
         self._initial_allowed_file_suffixes = allowed_file_suffixes
 
@@ -168,7 +173,7 @@ class FileChooserScreen(PathChooserScreen):
                 '(' + ', '.join(self.allowed_file_suffixes) + ')'
             )
 
-    def validate_selected_path(self, path: Path | None) -> bool:
+    def validate_selected_path(self, path: Union[Path, None]) -> bool:
         if not path or not path.is_file():
             self.app.bell()
             self.notify('Choose a valid file', severity='error')
@@ -182,7 +187,7 @@ class DirectoryChooserScreen(PathChooserScreen):
         await super().on_mount()
         self.modal_content.border_title = 'Directory chooser'
 
-    def validate_selected_path(self, path: Path | None) -> bool:
+    def validate_selected_path(self, path: Union[Path, None]) -> bool:
         if not path or not path.is_dir():
             self.app.bell()
             self.notify('Choose a valid directory', severity='error')
@@ -191,7 +196,7 @@ class DirectoryChooserScreen(PathChooserScreen):
         return True
 
 
-class _PathType(StrEnum):
+class _PathType(str, Enum):
     FILE = 'file'
     DIR = 'directory'
 
@@ -223,7 +228,7 @@ class PathChooser(Widget):
         """
 
         def __init__(
-            self, path_chooser: PathChooser, path: Path | None
+            self, path_chooser: PathChooser, path: Union[Path, None]
         ) -> None:
             super().__init__()
             self.path_chooser = path_chooser
@@ -244,8 +249,8 @@ class PathChooser(Widget):
     def __init__(
         self,
         path_type: _PathType,
-        allowed_file_suffixes: list[str] | None = None,
-        path: Path | None = None,
+        allowed_file_suffixes: Union[list[str], None] = None,
+        path: Union[Path, None] = None,
         *args,
         **kwargs,
     ) -> None:
@@ -275,13 +280,13 @@ class PathChooser(Widget):
         self.choose_button = self.query_one('#choose', Button)
 
     @property
-    def path(self) -> Path | None:
+    def path(self) -> Union[Path, None]:
         if self.path_input.value != '':
             return Path(self.path_input.value)
         return None
 
     @path.setter
-    def path(self, value: Path | None) -> None:
+    def path(self, value: Union[Path, None]) -> None:
         value = str(value) if value else ''
         self.path_input.value = value
         self.path_input.tooltip = value
@@ -294,7 +299,7 @@ class PathChooser(Widget):
 
     @on(Button.Pressed, '#choose')
     def _on_path_choose(self) -> None:
-        def set_path(path: Path | None = None) -> None:
+        def set_path(path: Union[Path, None] = None) -> None:
             self.path = path
 
         if self.path_type == _PathType.FILE:

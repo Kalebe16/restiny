@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from textual import on
 from textual.app import ComposeResult
@@ -50,7 +50,7 @@ class RequestArea(Static):
     """
 
     def __init__(self, *args, **kwargs) -> None:
-        self._auth_clipboard: dict | None = None
+        self._auth_clipboard: Union[dict, None] = None
         super().__init__(*args, **kwargs)
 
     def compose(self) -> ComposeResult:
@@ -296,7 +296,7 @@ class RequestArea(Static):
         )
 
     @property
-    def headers(self) -> list[dict[str, str | bool]]:
+    def headers(self) -> list[dict[str, Union[str, bool]]]:
         return [
             {
                 'enabled': header.enabled,
@@ -308,7 +308,7 @@ class RequestArea(Static):
         ]
 
     @headers.setter
-    def headers(self, headers: list[dict[str, str | bool]]) -> None:
+    def headers(self, headers: list[dict[str, Union[str, bool]]]) -> None:
         for field in self.header_fields.fields:
             self.header_fields.remove_field(field=field)
 
@@ -325,7 +325,7 @@ class RequestArea(Static):
             )
 
     @property
-    def params(self) -> list[dict[str, str | bool]]:
+    def params(self) -> list[dict[str, Union[str, bool]]]:
         return [
             {
                 'enabled': param.enabled,
@@ -337,7 +337,7 @@ class RequestArea(Static):
         ]
 
     @params.setter
-    def params(self, params: list[dict[str, str | bool]]) -> None:
+    def params(self, params: list[dict[str, Union[str, bool]]]) -> None:
         for field in self.param_fields.fields:
             self.param_fields.remove_field(field=field)
 
@@ -466,15 +466,15 @@ class RequestArea(Static):
         self.body_raw_editor.text = value
 
     @property
-    def body_file(self) -> Path | None:
+    def body_file(self) -> Union[Path, None]:
         return self.body_file_path_chooser.path
 
     @body_file.setter
-    def body_file(self, value: Path | None) -> None:
+    def body_file(self, value: Union[Path, None]) -> None:
         self.body_file_path_chooser.path = value
 
     @property
-    def body_form_urlencoded(self) -> list[dict[str, str | bool]]:
+    def body_form_urlencoded(self) -> list[dict[str, Union[str, bool]]]:
         return [
             {
                 'enabled': field.enabled,
@@ -487,7 +487,7 @@ class RequestArea(Static):
 
     @body_form_urlencoded.setter
     def body_form_urlencoded(
-        self, values: list[dict[str, str | bool]]
+        self, values: list[dict[str, Union[str, bool]]]
     ) -> None:
         for field in self.body_form_urlencoded_fields.fields:
             self.body_form_urlencoded_fields.remove_field(field=field)
@@ -505,7 +505,9 @@ class RequestArea(Static):
             )
 
     @property
-    def body_form_multipart(self) -> list[dict[str, str | bool, Path | None]]:
+    def body_form_multipart(
+        self,
+    ) -> list[dict[str, Union[str, bool, Path, None]]]:
         return [
             {
                 'enabled': field.enabled,
@@ -519,7 +521,7 @@ class RequestArea(Static):
 
     @body_form_multipart.setter
     def body_form_multipart(
-        self, values: list[dict[str, str | bool, Path | None]]
+        self, values: list[dict[str, Union[str, bool, Path, None]]]
     ) -> None:
         for field in self.body_form_multipart_fields.fields:
             self.body_form_multipart_fields.remove_field(field=field)
@@ -538,14 +540,14 @@ class RequestArea(Static):
             )
 
     @property
-    def option_timeout(self) -> float | None:
+    def option_timeout(self) -> Union[float, None]:
         try:
             return float(self.options_timeout_input.value)
         except ValueError:
             return None
 
     @option_timeout.setter
-    def option_timeout(self, value: float | None) -> None:
+    def option_timeout(self, value: Union[float, None]) -> None:
         self.options_timeout_input.value = '' if value is None else str(value)
 
     @property
@@ -615,7 +617,7 @@ class RequestArea(Static):
 
     @on(Select.Changed, '#body-raw-language')
     def _on_change_body_raw_language(self, message: Select.Changed) -> None:
-        self.body_raw_editor.language = message.value
+        self.body_raw_editor.language = message.value.value
 
     @on(Button.Pressed, '#copy-auth')
     def _on_copy_auth(self, message: Button.Pressed) -> None:
