@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from textual import on
 from textual.app import ComposeResult
@@ -135,7 +135,7 @@ class EnvironmentsScreen(ModalScreen):
         await self._populate_environments()
 
     @property
-    def _selected_env_id(self) -> int | None:
+    def _selected_env_id(self) -> Union[int, None]:
         if self.environments_list.index is None:
             return None
 
@@ -146,7 +146,7 @@ class EnvironmentsScreen(ModalScreen):
         )
 
     @property
-    def _selected_env_name(self) -> str | None:
+    def _selected_env_name(self) -> Union[str, None]:
         if self.environments_list.index is None:
             return None
 

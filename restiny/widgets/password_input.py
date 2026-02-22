@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import Enum
 
 from textual import on
 from textual.app import ComposeResult
@@ -12,12 +12,12 @@ from textual.widgets import Button
 from restiny.widgets import CustomInput
 
 
-class _Icon(StrEnum):
+class _Icon(str, Enum):
     SHOW = ' 🔓 '
     HIDE = ' 🔒 '
 
 
-class _Tooltip(StrEnum):
+class _Tooltip(str, Enum):
     SHOW = 'Show'
     HIDE = 'Hide'
 

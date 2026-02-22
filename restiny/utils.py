@@ -1,6 +1,7 @@
 import shlex
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Union
 
 import httpx
 
@@ -8,17 +9,17 @@ import httpx
 def build_curl_cmd(
     method: str,
     url: str,
-    headers: dict[str, str] | None = None,
-    params: dict[str, str] | None = None,
-    body_raw: str | None = None,
-    body_form_urlencoded: dict[str, str] | None = None,
-    body_form_multipart: dict[str, str | Path] | None = None,
-    body_files: list[Path] | None = None,
-    auth_basic: tuple[str, str] | None = None,
-    auth_bearer: str | None = None,
-    auth_api_key_header: tuple[str, str] | None = None,
-    auth_api_key_param: tuple[str, str] | None = None,
-    auth_digest: tuple[str, str] | None = None,
+    headers: Union[dict[str, str], None] = None,
+    params: Union[dict[str, str], None] = None,
+    body_raw: Union[str, None] = None,
+    body_form_urlencoded: Union[dict[str, str], None] = None,
+    body_form_multipart: Union[dict[str, str, Path], None] = None,
+    body_files: Union[list[Path], None] = None,
+    auth_basic: Union[tuple[str, str], None] = None,
+    auth_bearer: Union[str, None] = None,
+    auth_api_key_header: Union[tuple[str, str], None] = None,
+    auth_api_key_param: Union[tuple[str, str], None] = None,
+    auth_digest: Union[tuple[str, str], None] = None,
 ) -> str:
     cmd_parts = ['curl']
 
@@ -83,7 +84,7 @@ def filter_paths(
     paths: Iterable[Path],
     show_hidden_dirs: bool = False,
     show_hidden_files: bool = False,
-    allowed_file_suffixes: list[str] | None = None,
+    allowed_file_suffixes: Union[list[str], None] = None,
 ) -> list[Path]:
     """
     Filters a list of paths, hiding or showing hidden directories and files.
@@ -127,7 +128,7 @@ def previous_multiple_of(current_number: int, multiple_of: int) -> int:
     return ((current_number - 1) // multiple_of) * multiple_of
 
 
-def first_char_non_empty(text: str) -> int | None:
+def first_char_non_empty(text: str) -> Union[int, None]:
     """
     Returns the index of the first non-empty character in a string.
     """
@@ -136,7 +137,7 @@ def first_char_non_empty(text: str) -> int | None:
             return index
 
 
-def seconds_to_milliseconds(seconds: int | float) -> int:
+def seconds_to_milliseconds(seconds: Union[int, float]) -> int:
     return round(seconds * 1000)
 
 

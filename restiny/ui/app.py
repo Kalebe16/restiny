@@ -2,6 +2,7 @@ import asyncio
 import json
 from collections.abc import Iterable
 from http import HTTPStatus
+from typing import Union
 
 import httpx
 import pyperclip
@@ -114,10 +115,10 @@ class RESTinyApp(App, inherit_bindings=False):
         self.settings_repo = settings_repo
         self.environments_repo = environments_repo
 
-        self._active_request_task: asyncio.Task | None = None
-        self._last_focused_widget: Widget | None = None
-        self._last_focused_maximizable_area: Widget | None = None
-        self._selected_request: Request | None = None
+        self._active_request_task: Union[asyncio.Task, None] = None
+        self._last_focused_widget: Union[Widget, None] = None
+        self._last_focused_maximizable_area: Union[Widget, None] = None
+        self._selected_request: Union[Request, None] = None
         self._request_id_to_response: dict[int, httpx.Response] = {}
 
     def compose(self) -> ComposeResult:
@@ -363,7 +364,7 @@ class RESTinyApp(App, inherit_bindings=False):
 
     def _find_maximizable_area_by_widget(
         self, widget: Widget
-    ) -> Widget | None:
+    ) -> Union[Widget, None]:
         while widget is not None:
             if (
                 isinstance(widget, CollectionsArea)
@@ -375,11 +376,11 @@ class RESTinyApp(App, inherit_bindings=False):
             widget = widget.parent
 
     @property
-    def selected_request(self) -> Request | None:
+    def selected_request(self) -> Union[Request, None]:
         return self._selected_request
 
     @selected_request.setter
-    def selected_request(self, request: Request | None) -> None:
+    def selected_request(self, request: Union[Request, None]) -> None:
         if request is None:
             self.url_area.clear()
             self.request_area.clear()

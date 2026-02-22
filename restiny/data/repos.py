@@ -3,10 +3,10 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
-from datetime import UTC
-from enum import StrEnum
+from datetime import timezone
+from enum import Enum
 from functools import wraps
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Union
 
 from sqlalchemy import case, select
 from sqlalchemy.exc import IntegrityError, InterfaceError, OperationalError
@@ -48,7 +48,7 @@ def safe_repo(func):
     return wrapper
 
 
-class RepoStatus(StrEnum):
+class RepoStatus(str, Enum):
     OK = 'ok'
     NOT_FOUND = 'not_found'
     DUPLICATED = 'duplicated'
@@ -61,7 +61,7 @@ T = TypeVar('T')
 @dataclass
 class RepoResp(Generic[T]):
     status: RepoStatus = RepoStatus.OK
-    data: T | None = None
+    data: Union[T, None] = None
 
     @property
     def ok(self) -> bool:
@@ -74,7 +74,7 @@ class SQLRepoBase(ABC):
 
     @contextmanager
     def _ensure_session(
-        self, existing_session: Session | None
+        self, existing_session: Union[Session, None]
     ) -> Iterator[Session]:
         if existing_session:
             with nullcontext(existing_session) as session:
@@ -96,7 +96,7 @@ class FoldersSQLRepo(SQLRepoBase):
 
     @safe_repo
     def get_by_parent_id(
-        self, parent_id: int, session: Session | None = None
+        self, parent_id: int, session: Union[Session, None] = None
     ) -> RepoResp[list[Folder]]:
         with self._ensure_session(session) as session:
             sql_folders = session.scalars(
@@ -111,7 +111,7 @@ class FoldersSQLRepo(SQLRepoBase):
 
     @safe_repo
     def get_roots(
-        self, session: Session | None = None
+        self, session: Union[Session, None] = None
     ) -> RepoResp[list[Folder]]:
         with self._ensure_session(session) as session:
             sql_folders = session.scalars(
@@ -126,7 +126,7 @@ class FoldersSQLRepo(SQLRepoBase):
 
     @safe_repo
     def get_by_id(
-        self, id: int, session: Session | None = None
+        self, id: int, session: Union[Session, None] = None
     ) -> RepoResp[Folder]:
         with self._ensure_session(session) as session:
             sql_folder = session.get(SQLFolder, id)
@@ -138,7 +138,7 @@ class FoldersSQLRepo(SQLRepoBase):
 
     @safe_repo
     def create(
-        self, folder: Folder, session: Session | None = None
+        self, folder: Folder, session: Union[Session, None] = None
     ) -> RepoResp[Folder]:
         with self._ensure_session(session) as session:
             sql_folder = self._folder_to_sql(folder)
@@ -149,7 +149,7 @@ class FoldersSQLRepo(SQLRepoBase):
 
     @safe_repo
     def update(
-        self, folder: Folder, session: Session | None = None
+        self, folder: Folder, session: Union[Session, None] = None
     ) -> RepoResp[Folder]:
         with self._ensure_session(session) as session:
             sql_folder = session.get(SQLFolder, folder.id)
@@ -167,7 +167,7 @@ class FoldersSQLRepo(SQLRepoBase):
 
     @safe_repo
     def delete_by_id(
-        self, id: int, session: Session | None = None
+        self, id: int, session: Union[Session, None] = None
     ) -> RepoResp[None]:
         with self._ensure_session(session) as session:
             sql_folder = session.get(SQLFolder, id)
@@ -182,8 +182,8 @@ class FoldersSQLRepo(SQLRepoBase):
             id=sql_folder.id,
             parent_id=sql_folder.parent_id,
             name=sql_folder.name,
-            created_at=sql_folder.created_at.replace(tzinfo=UTC),
-            updated_at=sql_folder.updated_at.replace(tzinfo=UTC),
+            created_at=sql_folder.created_at.replace(tzinfo=timezone.utc),
+            updated_at=sql_folder.updated_at.replace(tzinfo=timezone.utc),
         )
 
     def _folder_to_sql(self, folder: Folder) -> SQLFolder:
@@ -199,7 +199,7 @@ class FoldersSQLRepo(SQLRepoBase):
 class RequestsSQLRepo(SQLRepoBase):
     @safe_repo
     def get_by_folder_id(
-        self, folder_id: int, session: Session | None = None
+        self, folder_id: int, session: Union[Session, None] = None
     ) -> RepoResp[list[Request]]:
         with self._ensure_session(session) as session:
             sql_requests = session.scalars(
@@ -214,7 +214,7 @@ class RequestsSQLRepo(SQLRepoBase):
 
     @safe_repo
     def get_by_id(
-        self, id: int, session: Session | None = None
+        self, id: int, session: Union[Session, None] = None
     ) -> RepoResp[Request]:
         with self._ensure_session(session) as session:
             sql_request = session.get(SQLRequest, id)
@@ -227,7 +227,7 @@ class RequestsSQLRepo(SQLRepoBase):
 
     @safe_repo
     def create(
-        self, request: Request, session: Session | None = None
+        self, request: Request, session: Union[Session, None] = None
     ) -> RepoResp[Request]:
         with self._ensure_session(session) as session:
             sql_request = self._request_to_sql(request)
@@ -238,7 +238,7 @@ class RequestsSQLRepo(SQLRepoBase):
 
     @safe_repo
     def update(
-        self, request: Request, session: Session | None = None
+        self, request: Request, session: Union[Session, None] = None
     ) -> RepoResp[Request]:
         with self._ensure_session(session) as session:
             sql_request = session.get(SQLRequest, request.id)
@@ -256,7 +256,7 @@ class RequestsSQLRepo(SQLRepoBase):
 
     @safe_repo
     def delete_by_id(
-        self, id: int, session: Session | None = None
+        self, id: int, session: Union[Session, None] = None
     ) -> RepoResp[None]:
         with self._ensure_session(session) as session:
             sql_request = session.get(SQLRequest, id)
@@ -306,8 +306,8 @@ class RequestsSQLRepo(SQLRepoBase):
                 follow_redirects=sql_request.option_follow_redirects,
                 verify_ssl=sql_request.option_verify_ssl,
             ),
-            created_at=sql_request.created_at.replace(tzinfo=UTC),
-            updated_at=sql_request.updated_at.replace(tzinfo=UTC),
+            created_at=sql_request.created_at.replace(tzinfo=timezone.utc),
+            updated_at=sql_request.updated_at.replace(tzinfo=timezone.utc),
         )
 
     def _request_to_sql(self, request: Request) -> SQLRequest:
@@ -343,7 +343,7 @@ class RequestsSQLRepo(SQLRepoBase):
 
 class SettingsSQLRepo(SQLRepoBase):
     @safe_repo
-    def get(self, session: Session | None = None) -> RepoResp[Settings]:
+    def get(self, session: Union[Session, None] = None) -> RepoResp[Settings]:
         with self._ensure_session(session) as session:
             sql_settings = session.scalar(select(SQLSettings).limit(1))
 
@@ -355,7 +355,7 @@ class SettingsSQLRepo(SQLRepoBase):
 
     @safe_repo
     def set(
-        self, settings: Settings, session: Session | None = None
+        self, settings: Settings, session: Union[Session, None] = None
     ) -> RepoResp[Settings]:
         with self._ensure_session(session) as session:
             sql_settings = session.scalar(select(SQLSettings).limit(1))
@@ -385,8 +385,8 @@ class SettingsSQLRepo(SQLRepoBase):
             id=sql_settings.id,
             theme=sql_settings.theme,
             editor_theme=sql_settings.editor_theme,
-            created_at=sql_settings.created_at.replace(tzinfo=UTC),
-            updated_at=sql_settings.updated_at.replace(tzinfo=UTC),
+            created_at=sql_settings.created_at.replace(tzinfo=timezone.utc),
+            updated_at=sql_settings.updated_at.replace(tzinfo=timezone.utc),
         )
 
     def _settings_to_sql(self, settings: Settings) -> SQLSettings:
@@ -402,7 +402,7 @@ class SettingsSQLRepo(SQLRepoBase):
 class EnvironmentsSQLRepo(SQLRepoBase):
     @safe_repo
     def get_by_id(
-        self, id: int, session: Session | None = None
+        self, id: int, session: Union[Session, None] = None
     ) -> RepoResp[Environment]:
         with self._ensure_session(session) as session:
             sql_environment = session.get(SQLEnvironment, id)
@@ -415,7 +415,7 @@ class EnvironmentsSQLRepo(SQLRepoBase):
 
     @safe_repo
     def get_by_name(
-        self, name: str, session: Session | None = None
+        self, name: str, session: Union[Session, None] = None
     ) -> RepoResp[Environment]:
         with self._ensure_session(session) as session:
             sql_environment = session.scalar(
@@ -430,7 +430,7 @@ class EnvironmentsSQLRepo(SQLRepoBase):
 
     @safe_repo
     def get_all(
-        self, session: Session | None = None
+        self, session: Union[Session, None] = None
     ) -> RepoResp[list[Environment]]:
         with self._ensure_session(session) as session:
             sql_envs = session.scalars(
@@ -444,7 +444,7 @@ class EnvironmentsSQLRepo(SQLRepoBase):
 
     @safe_repo
     def create(
-        self, environment: Environment, session: Session | None = None
+        self, environment: Environment, session: Union[Session, None] = None
     ) -> RepoResp[Environment]:
         with self._ensure_session(session) as session:
             sql_env = self._environment_to_sql(environment)
@@ -455,7 +455,7 @@ class EnvironmentsSQLRepo(SQLRepoBase):
 
     @safe_repo
     def update(
-        self, environment: Environment, session: Session | None = None
+        self, environment: Environment, session: Union[Session, None] = None
     ) -> RepoResp[Environment]:
         with self._ensure_session(session) as session:
             sql_environment = session.get(SQLEnvironment, environment.id)
@@ -473,7 +473,7 @@ class EnvironmentsSQLRepo(SQLRepoBase):
 
     @safe_repo
     def delete_by_id(
-        self, id: int, session: Session | None = None
+        self, id: int, session: Union[Session, None] = None
     ) -> RepoResp[None]:
         with self._ensure_session(session) as session:
             sql_environment = session.get(SQLEnvironment, id)
@@ -494,8 +494,8 @@ class EnvironmentsSQLRepo(SQLRepoBase):
             id=sql_environment.id,
             name=sql_environment.name,
             variables=json.loads(sql_environment.variables),
-            created_at=sql_environment.created_at.replace(tzinfo=UTC),
-            updated_at=sql_environment.updated_at.replace(tzinfo=UTC),
+            created_at=sql_environment.created_at.replace(tzinfo=timezone.utc),
+            updated_at=sql_environment.updated_at.replace(tzinfo=timezone.utc),
         )
 
     def _environment_to_sql(self, environment: Environment) -> SQLEnvironment:
