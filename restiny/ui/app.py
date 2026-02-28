@@ -119,6 +119,9 @@ class RESTinyApp(App, inherit_bindings=False):
         self._last_focused_maximizable_area: Widget | None = None
         self._selected_request: Request | None = None
         self._request_id_to_response: dict[int, httpx.Response] = {}
+        self._http_client: httpx.AsyncClient | None = None
+        self._http_client_config: tuple | None = None
+        self._cookies: httpx.Cookies = httpx.Cookies()
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -479,6 +482,7 @@ class RESTinyApp(App, inherit_bindings=False):
             timeout=self.request_area.option_timeout,
             follow_redirects=self.request_area.option_follow_redirects,
             verify_ssl=self.request_area.option_verify_ssl,
+            attach_cookies=self.request_area.option_attach_cookies,
         )
 
         return Request(
@@ -578,31 +582,44 @@ class RESTinyApp(App, inherit_bindings=False):
                     for form_field in request.body.fields
                 ]
 
+        self.request_area.option_timeout = str(request.options.timeout)
         self.request_area.option_follow_redirects = (
             request.options.follow_redirects
         )
         self.request_area.option_verify_ssl = request.options.verify_ssl
-        self.request_area.option_timeout = str(request.options.timeout)
+        self.request_area.option_attach_cookies = (
+            request.options.attach_cookies
+        )
 
     async def _send_request(self) -> None:
         self.response_area.clear()
         self.response_area.loading = True
         self.url_area.request_pending = True
+
         try:
             request = self.get_resolved_request()
+
             async with httpx.AsyncClient(
                 timeout=request.options.timeout,
                 follow_redirects=request.options.follow_redirects,
                 verify=request.options.verify_ssl,
             ) as http_client:
                 response = await http_client.send(
-                    request=request.to_httpx_req(),
+                    request=request.to_httpx_req(
+                        cookies=self._cookies
+                        if request.options.attach_cookies
+                        else None
+                    ),
                     auth=request.to_httpx_auth(),
                 )
-                self._display_response(response=response)
-                self.response_area.is_showing_response = True
 
-                self._request_id_to_response[request.id] = response
+            if request.options.attach_cookies:
+                self._cookies.extract_cookies(response)
+            self._display_response(response=response)
+            self.response_area.is_showing_response = True
+
+            self._request_id_to_response[request.id] = response
+
         except httpx.RequestError as error:
             error_name = type(error).__name__
             error_message = str(error)
@@ -612,9 +629,11 @@ class RESTinyApp(App, inherit_bindings=False):
                 self.notify(f'{error_name}', severity='error')
             self.response_area.clear()
             self.response_area.is_showing_response = False
+
         except asyncio.CancelledError:
             self.response_area.clear()
             self.response_area.is_showing_response = False
+
         finally:
             self.response_area.loading = False
             self.url_area.request_pending = False

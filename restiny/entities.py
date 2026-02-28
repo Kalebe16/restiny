@@ -98,6 +98,7 @@ class Request(BaseModel):
         timeout: float = 5.5
         follow_redirects: bool = True
         verify_ssl: bool = True
+        attach_cookies: bool = True
 
     id: int | None = None
 
@@ -227,7 +228,9 @@ class Request(BaseModel):
             )
         )
 
-    def to_httpx_req(self) -> httpx.Request:
+    def to_httpx_req(
+        self, cookies: httpx.Cookies | None = None
+    ) -> httpx.Request:
         headers: dict[str, str] = {
             header.key: header.value
             for header in self.headers
@@ -243,6 +246,7 @@ class Request(BaseModel):
                 url=self.url,
                 headers=headers,
                 params=params,
+                cookies=cookies,
             )
 
         if self.body_mode == BodyMode.RAW:
@@ -263,6 +267,7 @@ class Request(BaseModel):
                 headers=headers,
                 params=params,
                 content=self.body.value,
+                cookies=cookies,
             )
         elif self.body_mode == BodyMode.FILE:
             file = self.body.file
@@ -277,6 +282,7 @@ class Request(BaseModel):
                 headers=headers,
                 params=params,
                 content=file.read_bytes(),
+                cookies=cookies,
             )
         elif self.body_mode == BodyMode.FORM_URLENCODED:
             form_urlencoded = {
@@ -290,6 +296,7 @@ class Request(BaseModel):
                 headers=headers,
                 params=params,
                 data=form_urlencoded,
+                cookies=cookies,
             )
         elif self.body_mode == BodyMode.FORM_MULTIPART:
             form_multipart_str = {
@@ -314,6 +321,7 @@ class Request(BaseModel):
                 params=params,
                 data=form_multipart_str,
                 files=form_multipart_files,
+                cookies=cookies,
             )
 
     def to_httpx_auth(self) -> httpx.Auth | None:
