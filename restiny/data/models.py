@@ -56,6 +56,7 @@ class SQLRequest(SQLModelBase):
     option_timeout: Mapped[float | None] = mapped_column(nullable=True)
     option_follow_redirects: Mapped[bool] = mapped_column(nullable=False)
     option_verify_ssl: Mapped[bool] = mapped_column(nullable=False)
+    option_attach_cookies: Mapped[bool] = mapped_column(nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(),
