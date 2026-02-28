@@ -109,13 +109,10 @@ jobs:
 
       - name: Run smoke test
         run: |
-          RESTINY_HEADLESS=1 python -m restiny 2>stderr.log || true
-
-          cat stderr.log
-
-          if [ -s stderr.log ]; then
-            exit 1
-          fi
+          # Run the app for 6 seconds to ensure it starts correctly.
+          # `timeout` exits with code 124 when the time limit is reached,
+          # which is expected for this smoke test.
+          timeout 6s python -m restiny || test $? -eq 124
 
   publish-pkg:
     name: Publish package on PyPi

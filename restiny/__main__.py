@@ -12,9 +12,6 @@ def prepare_textual_dev_run() -> None:
 
 
 def run_app() -> None:
-    import os
-    import threading
-
     from restiny.data.db import DBManager
     from restiny.data.repos import (
         EnvironmentsSQLRepo,
@@ -33,13 +30,7 @@ def run_app() -> None:
         settings_repo=SettingsSQLRepo(db_manager=db_manager),
         environments_repo=EnvironmentsSQLRepo(db_manager=db_manager),
     )
-
-    if os.getenv('RESTINY_HEADLESS') == '1':
-        # Runs in CI to ensure the app starts headlessly without crashing (smoke test).
-        threading.Timer(10, lambda: app.exit()).start()
-        app.run(headless=True)
-    else:
-        app.run()
+    app.run()
 
 
 def main() -> None:
