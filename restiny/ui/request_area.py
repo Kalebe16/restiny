@@ -230,6 +230,11 @@ class RequestArea(Static):
                 with Horizontal(classes='h-auto'):
                     yield Switch(id='options-verify-ssl')
                     yield Label('Verify SSL', classes='pt-1')
+                with Horizontal(classes='h-auto'):
+                    yield Switch(id='options-attach-cookies')
+                    yield Label(
+                        'Attach cookies (store and send)', classes='pt-1'
+                    )
 
     def on_mount(self) -> None:
         self.header_fields = self.query_one('#headers', DynamicFields)
@@ -293,6 +298,9 @@ class RequestArea(Static):
         )
         self.options_verify_ssl_switch = self.query_one(
             '#options-verify-ssl', Switch
+        )
+        self.options_attach_cookies_switch = self.query_one(
+            '#options-attach-cookies', Switch
         )
 
     @property
@@ -563,6 +571,14 @@ class RequestArea(Static):
     @option_verify_ssl.setter
     def option_verify_ssl(self, value: bool) -> None:
         self.options_verify_ssl_switch.value = value
+
+    @property
+    def option_attach_cookies(self) -> bool:
+        return self.options_attach_cookies_switch.value
+
+    @option_attach_cookies.setter
+    def option_attach_cookies(self, value: bool) -> None:
+        self.options_attach_cookies_switch.value = value
 
     def clear(self) -> None:
         self.headers = []
