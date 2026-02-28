@@ -183,7 +183,7 @@ class RequestArea(Static):
                             id='body-raw-language',
                         )
                         yield CustomTextArea.code_editor(
-                            language='json', id='body-raw', classes='mt-1'
+                            id='body-raw', classes='mt-1'
                         )
                     with Horizontal(
                         id='body-mode-file', classes='h-auto mt-1'

@@ -119,8 +119,6 @@ class RESTinyApp(App, inherit_bindings=False):
         self._last_focused_maximizable_area: Widget | None = None
         self._selected_request: Request | None = None
         self._request_id_to_response: dict[int, httpx.Response] = {}
-        self._http_client: httpx.AsyncClient | None = None
-        self._http_client_config: tuple | None = None
         self._cookies: httpx.Cookies = httpx.Cookies()
 
     def compose(self) -> ComposeResult:
@@ -356,11 +354,18 @@ class RESTinyApp(App, inherit_bindings=False):
 
     def _apply_settings(self) -> None:
         settings = self.settings_repo.get().data
+
         self.call_later(lambda: setattr(self, 'theme', settings.theme))
+
         for text_area in self.query(CustomTextArea):
             self.call_later(
                 lambda ta=text_area: setattr(
                     ta, 'theme', settings.editor_theme
+                )
+            )
+            self.call_later(
+                lambda ta=text_area: setattr(
+                    ta, 'indent_width', settings.editor_indent
                 )
             )
 
@@ -664,7 +669,8 @@ class RESTinyApp(App, inherit_bindings=False):
         if self.response_area.body_raw_language == BodyRawLanguage.JSON:
             try:
                 self.response_area.body_raw = json.dumps(
-                    json.loads(response.text), indent=4
+                    json.loads(response.text),
+                    indent=self.settings_repo.get().data.editor_indent,
                 )
                 return
             except json.JSONDecodeError:

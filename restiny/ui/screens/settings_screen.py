@@ -62,6 +62,14 @@ class SettingsScreen(ModalScreen):
                     allow_blank=False,
                     id='editor-theme',
                 )
+            with Horizontal(classes='w-auto h-auto mt-1 px-1'):
+                yield Label('editor indent', classes='mt-1')
+                yield Select(
+                    [('2', 2), ('4', 4), ('8', 8)],
+                    value=settings.editor_indent,
+                    allow_blank=False,
+                    id='editor-indent',
+                )
             with Horizontal(classes='w-auto h-auto mt-1'):
                 yield Button(label='Cancel', classes='w-1fr', id='cancel')
                 yield Button(label='Confirm', classes='w-1fr', id='confirm')
@@ -70,6 +78,7 @@ class SettingsScreen(ModalScreen):
         self.modal_content = self.query_one('#modal-content', Vertical)
         self.theme_select = self.query_one('#theme', Select)
         self.editor_theme_select = self.query_one('#editor-theme', Select)
+        self.editor_indent_select = self.query_one('#editor-indent', Select)
         self.cancel_button = self.query_one('#cancel', Button)
         self.confirm_button = self.query_one('#confirm', Button)
 
@@ -85,6 +94,7 @@ class SettingsScreen(ModalScreen):
             Settings(
                 theme=self.theme_select.value,
                 editor_theme=self.editor_theme_select.value,
+                editor_indent=self.editor_indent_select.value,
             )
         )
         self.dismiss(result=True)

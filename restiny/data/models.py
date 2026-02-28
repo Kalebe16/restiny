@@ -78,6 +78,7 @@ class SQLSettings(SQLModelBase):
 
     theme: Mapped[str] = mapped_column(nullable=False)
     editor_theme: Mapped[str] = mapped_column(nullable=False)
+    editor_indent: Mapped[int] = mapped_column(nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(),

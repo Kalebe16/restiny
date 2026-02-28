@@ -420,6 +420,7 @@ class Settings(BaseModel):
 
     theme: str = 'textual-dark'
     editor_theme: str = 'vscode_dark'
+    editor_indent: int = 2
 
     created_at: datetime | None = None
     updated_at: datetime | None = None
