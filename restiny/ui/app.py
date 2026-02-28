@@ -662,7 +662,15 @@ class RESTinyApp(App, inherit_bindings=False):
             )
         )
         if self.response_area.body_raw_language == BodyRawLanguage.JSON:
-            indented_body_raw = json.dumps(json.loads(response.text), indent=4)
-            self.response_area.body_raw = indented_body_raw
-        else:
-            self.response_area.body_raw = response.text
+            try:
+                self.response_area.body_raw = json.dumps(
+                    json.loads(response.text), indent=4
+                )
+                return
+            except json.JSONDecodeError:
+                self.notify(
+                    message='Content-Type is JSON, but the response body is not valid JSON',
+                    severity='warning',
+                )
+
+        self.response_area.body_raw = response.text
