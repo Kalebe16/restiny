@@ -145,3 +145,24 @@ def shorten_string(value: str, max_lenght: int, elipsis: str = '..') -> str:
         return value
 
     return value[: max_lenght - len(elipsis)] + elipsis
+
+
+def is_textual_mimetype(mimetype: str) -> bool:
+    mimetype = mimetype.lower()
+
+    if mimetype.startswith('text'):
+        return True
+
+    if mimetype.endswith('json'):
+        return True
+
+    if mimetype.endswith('xml'):
+        return True
+
+    if mimetype.endswith('yaml'):
+        return True
+
+    if mimetype.endswith('javascript'):
+        return True
+
+    return False

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import mimetypes
 from collections.abc import Iterable
 from http import HTTPStatus
 
@@ -16,6 +17,7 @@ from textual.widgets import Footer, Header
 
 from restiny.__about__ import __version__
 from restiny.assets import STYLE_TCSS
+from restiny.consts import DOWNLOADS_DIR
 from restiny.data.db import DBManager
 from restiny.data.repos import (
     EnvironmentsSQLRepo,
@@ -48,6 +50,7 @@ from restiny.ui.screens.postman_environment_import_screen import (
     PostmanEnvironmentImportScreen,
 )
 from restiny.ui.screens.settings_screen import SettingsScreen
+from restiny.utils import is_textual_mimetype
 from restiny.widgets.custom_text_area import CustomTextArea
 
 
@@ -318,6 +321,12 @@ class RESTinyApp(App, inherit_bindings=False):
     @on(URLArea.SendRequest)
     def _on_send_request(self, message: URLArea.SendRequest) -> None:
         self._active_request_task = asyncio.create_task(self._send_request())
+
+    @on(URLArea.DownloadResponse)
+    def _on_download_response(self, message: URLArea.DownloadResponse) -> None:
+        self._active_request_task = asyncio.create_task(
+            self._send_request(download=True)
+        )
 
     @on(URLArea.CancelRequest)
     def _on_cancel_request(self, message: URLArea.CancelRequest) -> None:
@@ -596,7 +605,7 @@ class RESTinyApp(App, inherit_bindings=False):
             request.options.attach_cookies
         )
 
-    async def _send_request(self) -> None:
+    async def _send_request(self, download: bool = False) -> None:
         self.response_area.clear()
         self.response_area.loading = True
         self.url_area.request_pending = True
@@ -620,9 +629,43 @@ class RESTinyApp(App, inherit_bindings=False):
 
             if request.options.attach_cookies:
                 self._cookies.extract_cookies(response)
+
+            if download:
+                content_disposition = response.headers.get(
+                    'content-disposition'
+                )
+                if content_disposition and 'filename=' in content_disposition:
+                    filename = content_disposition.split('filename=')[
+                        -1
+                    ].strip('"')
+                else:
+                    filename = (
+                        response.url.path.removeprefix('/').removesuffix('/')
+                        or 'response'
+                    )
+                filename = filename.rsplit('.', 1)[0]
+
+                content_type = response.headers.get('content-type')
+                if content_type:
+                    filesuffix = (
+                        mimetypes.guess_extension(content_type.split(';')[0])
+                        or '.bin'
+                    )
+                else:
+                    filesuffix = '.bin'
+
+                download_file = DOWNLOADS_DIR / f'{filename}{filesuffix}'
+                counter = 1
+                while download_file.exists():
+                    download_file = (
+                        DOWNLOADS_DIR / f'{filename}({counter}){filesuffix}'
+                    )
+                    counter += 1
+                download_file.write_bytes(response.content)
+                self.notify(f'Download file {download_file}')
+
             self._display_response(response=response)
             self.response_area.is_showing_response = True
-
             self._request_id_to_response[request.id] = response
 
         except httpx.RequestError as error:
@@ -661,10 +704,12 @@ class RESTinyApp(App, inherit_bindings=False):
             header_key: header_value
             for header_key, header_value in response.headers.multi_items()
         }
+
+        content_type = response.headers.get('Content-Type', '')
+        mimetype = content_type.split(';', 1)[0].strip().lower()
+
         self.response_area.body_raw_language = (
-            content_type_to_body_language.get(
-                response.headers.get('Content-Type'), BodyRawLanguage.PLAIN
-            )
+            content_type_to_body_language.get(mimetype, BodyRawLanguage.PLAIN)
         )
         if self.response_area.body_raw_language == BodyRawLanguage.JSON:
             try:
@@ -679,4 +724,9 @@ class RESTinyApp(App, inherit_bindings=False):
                     severity='warning',
                 )
 
-        self.response_area.body_raw = response.text
+        if is_textual_mimetype(mimetype=mimetype):
+            self.response_area.body_raw = response.text
+        else:
+            self.response_area.body_raw = (
+                '[BINARY CONTENT]\nPress "Download" to save'
+            )
