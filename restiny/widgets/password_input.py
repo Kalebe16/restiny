@@ -102,7 +102,7 @@ class PasswordInput(Widget):
         self._input_kwargs = kwargs
 
     def compose(self) -> ComposeResult:
-        with Horizontal():
+        with Horizontal(classes='w-1fr'):
             yield CustomInput(
                 *self._input_args,
                 **self._input_kwargs,
