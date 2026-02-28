@@ -177,10 +177,10 @@ class CustomTextArea(TextArea, inherit_bindings=True):
             # Copy current line
             cursor_line, _ = self.cursor_location
             line_content = self.document.get_line(cursor_line)
-            pyperclip.copy(text=line_content)
+            self.app.copy_to_clipboard(text=line_content)
         else:
             # Copy selected text
-            pyperclip.copy(text=self.selected_text)
+            self.app.copy_to_clipboard(text=selected_text)
 
     def action_cut_selected(self) -> None:
         if self.read_only:
@@ -195,11 +195,11 @@ class CustomTextArea(TextArea, inherit_bindings=True):
             # Cut current line
             cursor_line, _ = self.cursor_location
             line_content = self.document.get_line(cursor_line)
-            pyperclip.copy(text=line_content)
+            self.app.copy_to_clipboard(text=line_content)
             self.action_delete_line()
         else:
             # Cut selected text
-            pyperclip.copy(text=self.selected_text)
+            self.app.copy_to_clipboard(text=selected_text)
             self.delete(start=self.selection.start, end=self.selection.end)
 
     async def action_paste(self) -> None:
