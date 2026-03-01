@@ -50,7 +50,7 @@ class ResponseArea(Static):
     def compose(self) -> ComposeResult:
         with ContentSwitcher(id='response-switcher', initial='no-content'):
             yield Label(
-                "[i]No response yet. [/]Press [b]'Send Request'[/][i] to continue. 🚀[/]",
+                "[i]No response yet. Press [b]'Send'[/] or [b]'Download'[/] to make a request. 🚀[/]",
                 id='no-content',
             )
 
