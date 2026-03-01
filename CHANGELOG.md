@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.14.0] - 2026-03-01
+
+### Added
+
+- Editor indent size setting
+- Response download
+
+### Fixed
+
+- Handle invalid JSON response body gracefully
+- Request create/update issues
+- Refresh CollectionsArea after update
+
 ## [0.13.0] - 2026-02-28
 
 ### Added

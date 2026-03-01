@@ -1,0 +1,2 @@
+ALTER TABLE settings
+  ADD editor_indent INTEGER NOT NULL DEFAULT 2

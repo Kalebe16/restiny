@@ -1,5 +1,5 @@
 """
-This module contains reusable widgets used in the DataFox interface.
+This module exports reusable widgets used in the RESTiny interface.
 """
 
 from restiny.widgets.collections_tree import CollectionsTree
