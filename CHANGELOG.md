@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.14.1] - 2026-03-01
+
+### Fixed
+
+- Update empty state label to match new button names
+
 ## [0.14.0] - 2026-03-01
 
 ### Added
