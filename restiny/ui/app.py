@@ -39,17 +39,13 @@ from restiny.ui import (
     TopBarArea,
     URLArea,
 )
-from restiny.ui.screens.environments_screen import EnvironmentsScreen
-from restiny.ui.screens.openapi_spec_import_screen import (
+from restiny.ui.screens import (
+    EnvironmentsScreen,
     OpenapiSpecImportScreen,
-)
-from restiny.ui.screens.postman_collection_import_screen import (
     PostmanCollectionImportScreen,
-)
-from restiny.ui.screens.postman_environment_import_screen import (
     PostmanEnvironmentImportScreen,
+    SettingsScreen,
 )
-from restiny.ui.screens.settings_screen import SettingsScreen
 from restiny.utils import is_textual_mimetype
 from restiny.widgets.custom_text_area import CustomTextArea
 
