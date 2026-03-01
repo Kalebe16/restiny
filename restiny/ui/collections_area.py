@@ -233,32 +233,30 @@ class CollectionsArea(Widget):
             self._sync_content_switcher()
             self.post_message(message=self.FolderAdded(folder_id=result.id))
 
-    def _on_prompt_update_result(
-        self, result: UpdateFolderResult | UpdateRequestResult | None
-    ) -> None:
+    def _on_prompt_update_result(self, result) -> None:
         if result is None:
             return
 
         if isinstance(result, UpdateRequestResult):
-            parent_node = self.collections_tree.node_by_id[result.folder_id]
-            old_parent_node = self.collections_tree.node_by_id[
-                result.old_folder_id
-            ]
-            self.populate_children(parent_node)
-            self.populate_children(old_parent_node)
-            self._sync_content_switcher()
-            self.post_message(
-                message=self.RequestUpdated(request_id=result.id)
-            )
+            parent = self.collections_tree.node_by_id[result.folder_id]
+            old_parent = self.collections_tree.node_by_id[result.old_folder_id]
+            if parent is old_parent:
+                self.populate_children(parent)
+            else:
+                self.populate_children(old_parent)
+                self.populate_children(parent)
+            self.post_message(self.RequestUpdated(request_id=result.id))
         elif isinstance(result, UpdateFolderResult):
-            parent_node = self.collections_tree.node_by_id[result.parent_id]
-            old_parent_node = self.collections_tree.node_by_id[
-                result.old_parent_id
-            ]
-            self.populate_children(parent_node)
-            self.populate_children(old_parent_node)
-            self._sync_content_switcher()
-            self.post_message(message=self.FolderUpdated(folder_id=result.id))
+            parent = self.collections_tree.node_by_id[result.parent_id]
+            old_parent = self.collections_tree.node_by_id[result.old_parent_id]
+            if parent is old_parent:
+                self.populate_children(parent)
+            else:
+                self.populate_children(old_parent)
+                self.populate_children(parent)
+            self.post_message(self.FolderUpdated(folder_id=result.id))
+
+        self._sync_content_switcher()
 
     def _on_prompt_delete_result(self, result: bool) -> None:
         if result is False:
