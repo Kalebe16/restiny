@@ -284,6 +284,7 @@ class RequestsSQLRepo(SQLRepoBase):
             SQLRequest.option_timeout.key,
             SQLRequest.option_follow_redirects.key,
             SQLRequest.option_verify_ssl.key,
+            SQLRequest.option_attach_cookies.key,
         ]
 
     def _sql_to_request(self, sql_request: SQLRequest) -> Request:
@@ -305,6 +306,7 @@ class RequestsSQLRepo(SQLRepoBase):
                 timeout=sql_request.option_timeout,
                 follow_redirects=sql_request.option_follow_redirects,
                 verify_ssl=sql_request.option_verify_ssl,
+                attach_cookies=sql_request.option_attach_cookies,
             ),
             created_at=sql_request.created_at.replace(tzinfo=UTC),
             updated_at=sql_request.updated_at.replace(tzinfo=UTC),
@@ -336,6 +338,7 @@ class RequestsSQLRepo(SQLRepoBase):
             option_timeout=request.options.timeout,
             option_follow_redirects=request.options.follow_redirects,
             option_verify_ssl=request.options.verify_ssl,
+            option_attach_cookies=request.options.attach_cookies,
             created_at=request.created_at,
             updated_at=request.updated_at,
         )
