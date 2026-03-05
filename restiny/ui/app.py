@@ -636,7 +636,9 @@ class RESTinyApp(App, inherit_bindings=False):
                     ].strip('"')
                 else:
                     filename = (
-                        response.url.path.removeprefix('/').removesuffix('/')
+                        response.url.path.removeprefix('/')
+                        .removesuffix('/')
+                        .replace('/', '-')
                         or 'response'
                     )
                 filename = filename.rsplit('.', 1)[0]
@@ -711,6 +713,7 @@ class RESTinyApp(App, inherit_bindings=False):
             try:
                 self.response_area.body_raw = json.dumps(
                     json.loads(response.text),
+                    ensure_ascii=False,
                     indent=self.settings_repo.get().data.editor_indent,
                 )
                 return

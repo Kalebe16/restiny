@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.14.2] - 2026-03-05
+
+### Fixed
+
+- Response download
+- Display unicode characters in response JSON body
+
 ## [0.14.1] - 2026-03-01
 
 ### Fixed
