@@ -713,6 +713,7 @@ class RESTinyApp(App, inherit_bindings=False):
             try:
                 self.response_area.body_raw = json.dumps(
                     json.loads(response.text),
+                    ensure_ascii=False,
                     indent=self.settings_repo.get().data.editor_indent,
                 )
                 return
