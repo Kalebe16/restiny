@@ -1,7 +1,7 @@
-textual>=8.0, <8.1
-textual[syntax]
 httpx>=0.28, <0.29
-pyperclip>=1.9, <1.10
 sqlalchemy>=2.0, <2.1
 pydantic>=2.12, <2.13
 PyYAML>=6.0, <6.1
+qtmonaco>=0.10, <0.11
+qasync>=0.28, <0.29
+PySide6>=6.11, <6.12

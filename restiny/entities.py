@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import mimetypes
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import parse_qsl, urlparse, urlunparse
+from uuid import UUID, uuid4
 
 import httpx
 from pydantic import BaseModel, field_validator
@@ -23,6 +27,7 @@ from restiny.utils import build_curl_cmd
 
 class Folder(BaseModel):
     id: int | None = None
+    uuid: UUID = _Field(default_factory=uuid4)
 
     name: str
     parent_id: int | None = None
@@ -101,8 +106,9 @@ class Request(BaseModel):
         attach_cookies: bool = True
 
     id: int | None = None
+    uuid: UUID = _Field(default_factory=uuid4)
 
-    folder_id: int
+    folder_id: int | None = None
     name: str
 
     method: HTTPMethod = HTTPMethod.GET
@@ -112,13 +118,15 @@ class Request(BaseModel):
 
     body_enabled: bool = False
     body_mode: str = BodyMode.RAW
-    body: (
-        RawBody | FileBody | UrlEncodedFormBody | MultipartFormBody | None
-    ) = None
+    body: RawBody | FileBody | UrlEncodedFormBody | MultipartFormBody = (
+        RawBody(language=BodyRawLanguage.PLAIN, value='')
+    )
 
     auth_enabled: bool = False
     auth_mode: AuthMode = AuthMode.BASIC
-    auth: BasicAuth | BearerAuth | ApiKeyAuth | DigestAuth | None = None
+    auth: BasicAuth | BearerAuth | ApiKeyAuth | DigestAuth = BasicAuth(
+        username='', password=''
+    )
 
     options: Options = _Field(default_factory=Options)
 
@@ -228,9 +236,7 @@ class Request(BaseModel):
             )
         )
 
-    def to_httpx_req(
-        self, cookies: httpx.Cookies | None = None
-    ) -> httpx.Request:
+    def to_httpx_req(self, httpx_client: httpx.AsyncClient) -> httpx.Request:
         headers: dict[str, str] = {
             header.key: header.value
             for header in self.headers
@@ -240,15 +246,20 @@ class Request(BaseModel):
             param.key: param.value for param in self.params if param.enabled
         }
 
+        parsed_url = urlparse(self.url)
+        url_params = dict(parse_qsl(parsed_url.query))
+        merged_params = {**url_params, **params}
+        clean_url = urlunparse(parsed_url._replace(query=''))
+        params = merged_params
+        url = clean_url
+
         if not self.body_enabled:
-            return httpx.Request(
+            return httpx_client.build_request(
                 method=self.method,
                 url=self.url,
                 headers=headers,
                 params=params,
-                cookies=cookies,
             )
-
         if self.body_mode == BodyMode.RAW:
             raw_language_to_content_type = {
                 BodyRawLanguage.JSON: ContentType.JSON,
@@ -260,14 +271,12 @@ class Request(BaseModel):
             headers['content-type'] = raw_language_to_content_type.get(
                 self.body.language, ContentType.TEXT
             )
-
-            return httpx.Request(
+            return httpx_client.build_request(
                 method=self.method,
-                url=self.url,
+                url=url,
                 headers=headers,
                 params=params,
                 content=self.body.value,
-                cookies=cookies,
             )
         elif self.body_mode == BodyMode.FILE:
             file = self.body.file
@@ -276,13 +285,12 @@ class Request(BaseModel):
                     mimetypes.guess_type(file.name)[0]
                     or 'application/octet-stream'
                 )
-            return httpx.Request(
+            return httpx_client.build_request(
                 method=self.method,
-                url=self.url,
+                url=url,
                 headers=headers,
                 params=params,
                 content=file.read_bytes(),
-                cookies=cookies,
             )
         elif self.body_mode == BodyMode.FORM_URLENCODED:
             form_urlencoded = {
@@ -290,13 +298,12 @@ class Request(BaseModel):
                 for form_item in self.body.fields
                 if form_item.enabled
             }
-            return httpx.Request(
+            return httpx_client.build_request(
                 method=self.method,
-                url=self.url,
+                url=url,
                 headers=headers,
                 params=params,
                 data=form_urlencoded,
-                cookies=cookies,
             )
         elif self.body_mode == BodyMode.FORM_MULTIPART:
             form_multipart_str = {
@@ -314,14 +321,13 @@ class Request(BaseModel):
                 for form_item in self.body.fields
                 if form_item.enabled and isinstance(form_item.value, Path)
             }
-            return httpx.Request(
+            return httpx_client.build_request(
                 method=self.method,
-                url=self.url,
+                url=url,
                 headers=headers,
                 params=params,
                 data=form_multipart_str,
                 files=form_multipart_files,
-                cookies=cookies,
             )
 
     def to_httpx_auth(self) -> httpx.Auth | None:
@@ -414,16 +420,22 @@ class Request(BaseModel):
             auth_digest=auth_digest,
         )
 
-
-class Settings(BaseModel):
-    id: int | None = None
-
-    theme: str = 'textual-dark'
-    editor_theme: str = 'vscode_dark'
-    editor_indent: int = 2
-
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    def gen_hash(self) -> str:
+        return hashlib.sha256(
+            json.dumps(
+                self.model_dump(
+                    exclude=[
+                        'id',
+                        'uuid',
+                        'folder_id',
+                        'created_at',
+                        'updated_at',
+                    ]
+                ),
+                sort_keys=True,
+                default=str,
+            ).encode('utf-8')
+        ).hexdigest()
 
 
 class Environment(BaseModel):
@@ -468,3 +480,12 @@ class Environment(BaseModel):
             )
 
         return self.model_copy(update=dict(variables=resolved_vars))
+
+
+class Settings(BaseModel):
+    id: int | None = None
+
+    theme: str = 'system'
+
+    created_at: datetime | None = None
+    updated_at: datetime | None = None

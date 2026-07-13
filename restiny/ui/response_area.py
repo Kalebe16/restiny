@@ -1,191 +1,141 @@
-import re
-from http import HTTPStatus
-
-from textual import on
-from textual.app import ComposeResult
-from textual.containers import VerticalScroll
-from textual.widgets import (
-    ContentSwitcher,
-    DataTable,
-    Label,
-    Select,
-    Static,
-    TabbedContent,
-    TabPane,
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QComboBox,
+    QGroupBox,
+    QHeaderView,
+    QLabel,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
+from qtmonaco import Monaco
 
 from restiny.enums import BodyRawLanguage
-from restiny.widgets import CustomTextArea
+
+NO_RESPONSE_TEXT = "No response yet. Press 'Send' or 'Download' to continue."
 
 
-# TODO: Implement 'Trace' tab pane
-class ResponseArea(Static):
-    ALLOW_MAXIMIZE = True
-    focusable = True
-    BORDER_TITLE = 'Response'
-    DEFAULT_CSS = """
-    ResponseArea {
-        width: 1fr;
-        height: 1fr;
-        border: heavy $panel;
-        border-title-color: $text-muted;
-        border-subtitle-color: $text-muted;
-        padding: 1;
-    }
+class ResponseArea(QWidget):
+    def __init__(self):
+        super().__init__()
+        self._is_loading = False
 
-    #no-content {
-        height: 1fr;
-        width: 1fr;
-        content-align: center middle;
-    }
-    """
+        self.no_response_label = QLabel()
+        self.no_response_label.setText(NO_RESPONSE_TEXT)
+        self.no_response_label.setAlignment(Qt.AlignCenter)
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._title_regex = (
-            rf'^{self.BORDER_TITLE}\s+(?P<code>\d{{3}})\((?P<phrase>[^)]+)\)$'
-        )
-        self._subtitle_regex = r'^(?P<content_size>\d+)\s+bytes\s+in\s+(?P<elapsed_time>[\d.]+)\s+seconds$'
+        # Tabs
+        self.tabs = QTabWidget()
+        headers_tab = QWidget()
+        body_tab = QWidget()
 
-    def compose(self) -> ComposeResult:
-        with ContentSwitcher(id='response-switcher', initial='no-content'):
-            yield Label(
-                "[i]No response yet. Press [b]'Send'[/] or [b]'Download'[/] to make a request. 🚀[/]",
-                id='no-content',
-            )
+        # Headers tab
+        self.headers_table = QTableWidget()
+        self.headers_table.setColumnCount(2)
+        self.headers_table.setHorizontalHeaderLabels(['key', 'value'])
+        header = self.headers_table.horizontalHeader()
+        header.setStretchLastSection(True)
+        header.setSectionResizeMode(QHeaderView.Stretch)
+        headers_layout = QVBoxLayout(headers_tab)
+        headers_layout.addWidget(self.headers_table, 1)
 
-            with TabbedContent(id='content'):
-                with TabPane('Headers'):
-                    with VerticalScroll():
-                        yield DataTable(show_cursor=False, id='headers')
-                with TabPane('Body'):
-                    yield Select(
-                        (
-                            ('Plain', BodyRawLanguage.PLAIN),
-                            ('HTML', BodyRawLanguage.HTML),
-                            ('JSON', BodyRawLanguage.JSON),
-                            ('YAML', BodyRawLanguage.YAML),
-                            ('XML', BodyRawLanguage.XML),
-                        ),
-                        allow_blank=False,
-                        tooltip='Syntax highlighting for the response body',
-                        id='body-raw-language',
-                    )
-                    yield CustomTextArea.code_editor(
-                        id='body-raw', read_only=True, classes='mt-1'
-                    )
-
-    def on_mount(self) -> None:
-        self._response_switcher = self.query_one(
-            '#response-switcher', ContentSwitcher
+        # Body tab
+        self.body_text_editor = Monaco()
+        self.body_text_editor.set_language('plaintext')
+        self.body_text_editor.set_theme('vs-dark')
+        self.body_text_editor.set_minimap_enabled(True)
+        self.body_text_editor._connector.send(
+            'update_editor_options',
+            {
+                'tabSize': 2,
+                'insertSpaces': True,
+                'detectIndentation': False,
+            },
         )
 
-        self.headers_data_table = self.query_one('#headers', DataTable)
-        self.body_raw_language_select = self.query_one(
-            '#body-raw-language', Select
+        self.body_raw_language_combobox = QComboBox()
+        self.body_raw_language_combobox.addItems(
+            [language for language in BodyRawLanguage]
         )
-        self.body_raw_editor = self.query_one('#body-raw', CustomTextArea)
+        self.body_raw_language_combobox.currentTextChanged.connect(
+            self._on_text_type_changed
+        )
 
-        self.headers_data_table.add_columns('Key', 'Value')
+        body_layout = QVBoxLayout(body_tab)
+        body_layout.addWidget(self.body_text_editor)
+        body_layout.addWidget(self.body_raw_language_combobox)
+
+        self.tabs.addTab(headers_tab, 'Headers')
+        self.tabs.addTab(body_tab, 'Body')
+
+        self.group_box = QGroupBox()
+        self.group_box.setTitle('Response')
+
+        group_layout = QVBoxLayout(self.group_box)
+        group_layout.addWidget(self.tabs)
+        group_layout.addWidget(self.no_response_label)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.group_box)
+        self.show_empty()
 
     @property
-    def status(self) -> HTTPStatus | None:
-        match = re.match(self._title_regex, self.border_title)
-        if match:
-            return HTTPStatus(int(match['code']))
-        return None
+    def is_loading(self) -> bool:
+        return self._is_loading
 
-    @status.setter
-    def status(self, value: HTTPStatus) -> None:
-        self.border_title = (
-            f'{self.BORDER_TITLE} {value.value}({value.phrase})'
-        )
-
-    @property
-    def content_size(self) -> int | None:
-        match = re.match(self._subtitle_regex, self.border_subtitle)
-        if match:
-            return int(match['content_size'])
-        return None
-
-    @content_size.setter
-    def content_size(self, value: int) -> None:
-        match = re.match(self._subtitle_regex, self.border_subtitle)
-        if match:
-            elapsed_time = match['elapsed_time']
+    @is_loading.setter
+    def is_loading(self, value: bool) -> None:
+        if value:
+            self.no_response_label.setText('Loading...')
+            self.show_empty()
         else:
-            elapsed_time = '0'
+            self.no_response_label.setText(NO_RESPONSE_TEXT)
 
-        self.border_subtitle = f'{value} bytes in {elapsed_time} seconds'
+    def show_empty(self) -> None:
+        self.no_response_label.show()
+        self.tabs.hide()
 
-    @property
-    def elapsed_time(self) -> float | None:
-        match = re.match(self._subtitle_regex, self.border_subtitle)
-        if match:
-            return float(match['elapsed_time'])
-        return None
+    def show_response(self) -> None:
+        self.no_response_label.hide()
+        self.tabs.show()
 
-    @elapsed_time.setter
-    def elapsed_time(self, value: float) -> None:
-        match = re.match(self._subtitle_regex, self.border_subtitle)
-        if match:
-            content_size = match['content_size']
-        else:
-            content_size = '0'
+    def set_data(self, data: dict) -> None:
+        self.group_box.setTitle(
+            f'Response - {data["status"].value} {data["status"].phrase} '
+            f'({data["content_size"]} bytes in {data["elapsed_time"]} seconds)'
+        )
 
-        self.border_subtitle = f'{content_size} bytes in {value} seconds'
+        self.headers_table.clearContents()
+        self.headers_table.setRowCount(len(data['headers']))
+        for row, (header_key, header_value) in enumerate(
+            data['headers'].items()
+        ):
+            self.headers_table.setItem(row, 0, QTableWidgetItem(header_key))
+            self.headers_table.setItem(row, 1, QTableWidgetItem(header_value))
 
-    @property
-    def headers(self) -> dict[str, str]:
-        headers = {}
-        for row_key in self.headers_data_table.rows:
-            cells = self.headers_data_table.get_row(row_key)
-            headers[cells[0]] = cells[1]
-        return headers
+        self.body_text_editor.set_text(
+            value=data['body_raw'], language=data['body_raw_language']
+        )
+        self.body_raw_language_combobox.setCurrentText(
+            data['body_raw_language']
+        )
 
-    @headers.setter
-    def headers(self, value: dict[str, str]) -> None:
-        self.headers_data_table.clear()
-        for header_key, header_value in value.items():
-            self.headers_data_table.add_row(header_key, header_value)
+    def clear_data(self):
+        self.group_box.setTitle('Response')
+        self.headers_table.clearContents()
+        self.body_text_editor.set_text(value='')
 
-    @property
-    def body_raw_language(self) -> BodyRawLanguage:
-        return self.body_raw_language_select.value
+    def _on_text_type_changed(self, text_type: str) -> None:
+        self.body_text_editor.set_language(language=text_type)
 
-    @body_raw_language.setter
-    def body_raw_language(self, value: BodyRawLanguage) -> None:
-        self.body_raw_language_select.value = value
-
-    @property
-    def body_raw(self) -> str:
-        return self.body_raw_editor.text
-
-    @body_raw.setter
-    def body_raw(self, value: str) -> None:
-        self.body_raw_editor.text = value
-
-    @property
-    def is_showing_response(self) -> bool:
-        if self._response_switcher.current == 'content':
-            return True
-        elif self._response_switcher.current == 'no-content':
-            return False
-
-    @is_showing_response.setter
-    def is_showing_response(self, value: bool) -> None:
-        if value is True:
-            self._response_switcher.current = 'content'
-        elif value is False:
-            self._response_switcher.current = 'no-content'
-
-    def clear(self) -> None:
-        self.border_title = self.BORDER_TITLE
-        self.border_subtitle = ''
-        self.headers_data_table.clear()
-        self.body_raw_language_select.value = BodyRawLanguage.PLAIN
-        self.body_raw_editor.clear()
-
-    @on(Select.Changed, '#body-raw-language')
-    def _on_body_raw_language_changed(self, message: Select.Changed) -> None:
-        self.body_raw_editor.language = self.body_raw_language_select.value
+    def _on_indent_size_changed(self, indent_size: str) -> None:
+        self.body_text_editor._connector.send(
+            'update_editor_options',
+            {
+                'tabSize': int(indent_size),
+                'insertSpaces': True,
+                'detectIndentation': False,
+            },
+        )

@@ -20,9 +20,6 @@ from restiny.data.models import (
     SQLSettings,
 )
 from restiny.entities import Environment, Folder, Request, Settings
-from restiny.logger import get_logger
-
-logger = get_logger()
 
 
 def safe_repo(func):
@@ -35,14 +32,13 @@ def safe_repo(func):
             InterfaceError,
             OperationalError,
         ):
-            logger.exception('DB error')
             return RepoResp(status=RepoStatus.DB_ERROR)
 
         except IntegrityError as error:
             if 'UNIQUE' in str(error):
                 return RepoResp(status=RepoStatus.DUPLICATED)
 
-            logger.exception('DB error')
+            print(error)
             return RepoResp(status=RepoStatus.DB_ERROR)
 
     return wrapper
@@ -180,6 +176,7 @@ class FoldersSQLRepo(SQLRepoBase):
     def _sql_to_folder(self, sql_folder: SQLFolder) -> Folder:
         return Folder(
             id=sql_folder.id,
+            uuid=sql_folder.uuid,
             parent_id=sql_folder.parent_id,
             name=sql_folder.name,
             created_at=sql_folder.created_at.replace(tzinfo=UTC),
@@ -189,6 +186,7 @@ class FoldersSQLRepo(SQLRepoBase):
     def _folder_to_sql(self, folder: Folder) -> SQLFolder:
         return SQLFolder(
             id=folder.id,
+            uuid=str(folder.uuid),
             parent_id=folder.parent_id,
             name=folder.name,
             created_at=folder.created_at,
@@ -218,6 +216,25 @@ class RequestsSQLRepo(SQLRepoBase):
     ) -> RepoResp[Request]:
         with self._ensure_session(session) as session:
             sql_request = session.get(SQLRequest, id)
+
+            if not sql_request:
+                return RepoResp(status=RepoStatus.NOT_FOUND)
+
+            request = self._sql_to_request(sql_request)
+            return RepoResp(data=request)
+
+    @safe_repo
+    def get_by_name_and_folder_id(
+        self, name: str, folder_id: int, session: Session | None = None
+    ) -> RepoResp[Request]:
+        with self._ensure_session(session) as session:
+            sql_request = (
+                session.query(SQLRequest)
+                .filter(
+                    SQLRequest.name == name, SQLRequest.folder_id == folder_id
+                )
+                .first()
+            )
 
             if not sql_request:
                 return RepoResp(status=RepoStatus.NOT_FOUND)
@@ -290,6 +307,7 @@ class RequestsSQLRepo(SQLRepoBase):
     def _sql_to_request(self, sql_request: SQLRequest) -> Request:
         return Request(
             id=sql_request.id,
+            uuid=sql_request.uuid,
             folder_id=sql_request.folder_id,
             name=sql_request.name,
             method=sql_request.method,
@@ -315,6 +333,7 @@ class RequestsSQLRepo(SQLRepoBase):
     def _request_to_sql(self, request: Request) -> SQLRequest:
         return SQLRequest(
             id=request.id,
+            uuid=str(request.uuid),
             folder_id=request.folder_id,
             name=request.name,
             method=request.method,
@@ -327,84 +346,24 @@ class RequestsSQLRepo(SQLRepoBase):
             ),
             body_enabled=request.body_enabled,
             body_mode=request.body_mode,
-            body=json.dumps(request.body.model_dump(), default=str)
-            if request.body
-            else None,
+            body=(
+                json.dumps(request.body.model_dump(), default=str)
+                if request.body
+                else None
+            ),
             auth_enabled=request.auth_enabled,
             auth_mode=request.auth_mode,
-            auth=json.dumps(request.auth.model_dump(), default=str)
-            if request.auth
-            else None,
+            auth=(
+                json.dumps(request.auth.model_dump(), default=str)
+                if request.auth
+                else None
+            ),
             option_timeout=request.options.timeout,
             option_follow_redirects=request.options.follow_redirects,
             option_verify_ssl=request.options.verify_ssl,
             option_attach_cookies=request.options.attach_cookies,
             created_at=request.created_at,
             updated_at=request.updated_at,
-        )
-
-
-class SettingsSQLRepo(SQLRepoBase):
-    @safe_repo
-    def get(self, session: Session | None = None) -> RepoResp[Settings]:
-        with self._ensure_session(session) as session:
-            sql_settings = session.scalar(select(SQLSettings).limit(1))
-
-            if not sql_settings:
-                return RepoResp(data=Settings())
-
-            settings = self._sql_to_settings(sql_settings)
-            return RepoResp(data=settings)
-
-    @safe_repo
-    def set(
-        self, settings: Settings, session: Session | None = None
-    ) -> RepoResp[Settings]:
-        with self._ensure_session(session) as session:
-            sql_settings = session.scalar(select(SQLSettings).limit(1))
-
-            if not sql_settings:
-                # create
-                sql_settings = self._settings_to_sql(settings=settings)
-                session.add(sql_settings)
-                session.flush()
-                new_settings = self._sql_to_settings(sql_settings=sql_settings)
-                return RepoResp(data=new_settings)
-            else:
-                # update
-                new_data = self._settings_to_sql(settings=settings)
-                for field in self._updatable_sql_fields:
-                    setattr(sql_settings, field, getattr(new_data, field))
-                session.flush()
-                new_settings = self._sql_to_settings(sql_settings=sql_settings)
-                return RepoResp(data=new_settings)
-
-    @property
-    def _updatable_sql_fields(self) -> list[str]:
-        return [
-            SQLSettings.theme.key,
-            SQLSettings.editor_theme.key,
-            SQLSettings.editor_indent.key,
-        ]
-
-    def _sql_to_settings(self, sql_settings: SQLSettings) -> Settings:
-        return Settings(
-            id=sql_settings.id,
-            theme=sql_settings.theme,
-            editor_theme=sql_settings.editor_theme,
-            editor_indent=sql_settings.editor_indent,
-            created_at=sql_settings.created_at.replace(tzinfo=UTC),
-            updated_at=sql_settings.updated_at.replace(tzinfo=UTC),
-        )
-
-    def _settings_to_sql(self, settings: Settings) -> SQLSettings:
-        return SQLSettings(
-            id=settings.id,
-            theme=settings.theme,
-            editor_theme=settings.editor_theme,
-            editor_indent=settings.editor_indent,
-            created_at=settings.created_at,
-            updated_at=settings.updated_at,
         )
 
 
@@ -516,4 +475,62 @@ class EnvironmentsSQLRepo(SQLRepoBase):
             ),
             created_at=environment.created_at,
             updated_at=environment.updated_at,
+        )
+
+
+class SettingsSQLRepo(SQLRepoBase):
+    @safe_repo
+    def get(self, session: Session | None = None) -> RepoResp[Settings]:
+        with self._ensure_session(session) as session:
+            sql_settings = session.scalar(select(SQLSettings).limit(1))
+
+            if not sql_settings:
+                return RepoResp(data=Settings())
+
+            settings = self._sql_to_settings(sql_settings)
+            return RepoResp(data=settings)
+
+    @safe_repo
+    def set(
+        self, settings: Settings, session: Session | None = None
+    ) -> RepoResp[Settings]:
+        with self._ensure_session(session) as session:
+            sql_settings = session.scalar(select(SQLSettings).limit(1))
+
+            if not sql_settings:
+                # create
+                sql_settings = self._settings_to_sql(settings=settings)
+                session.add(sql_settings)
+                session.flush()
+                new_settings = self._sql_to_settings(sql_settings=sql_settings)
+                return RepoResp(data=new_settings)
+            else:
+                # update
+                new_data = self._settings_to_sql(settings=settings)
+                for field in self._updatable_sql_fields:
+                    setattr(sql_settings, field, getattr(new_data, field))
+                session.flush()
+                new_settings = self._sql_to_settings(sql_settings=sql_settings)
+                return RepoResp(data=new_settings)
+
+    @property
+    def _updatable_sql_fields(self) -> list[str]:
+        return [
+            SQLSettings.theme.key,
+        ]
+
+    def _sql_to_settings(self, sql_settings: SQLSettings) -> Settings:
+        return Settings(
+            id=sql_settings.id,
+            theme=sql_settings.theme,
+            created_at=sql_settings.created_at.replace(tzinfo=UTC),
+            updated_at=sql_settings.updated_at.replace(tzinfo=UTC),
+        )
+
+    def _settings_to_sql(self, settings: Settings) -> SQLSettings:
+        return SQLSettings(
+            id=settings.id,
+            theme=settings.theme,
+            created_at=settings.created_at,
+            updated_at=settings.updated_at,
         )

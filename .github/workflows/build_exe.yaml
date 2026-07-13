@@ -54,29 +54,12 @@ jobs:
         run: |
           pyinstaller \
             --onefile \
-            --console \
+            --windowed \
+            --icon ./restiny/assets/app.png \
             --name restiny \
+            --collect-data qtmonaco \
             --add-data "restiny/data/sql:data/sql" \
             --add-data "restiny/assets:assets" \
-            --collect-data textual \
-            --collect-submodules textual.widgets \
-            --collect-submodules rich._unicode_data \
-            --collect-all tree_sitter \
-            --collect-all tree_sitter_bash \
-            --collect-all tree_sitter_css \
-            --collect-all tree_sitter_go \
-            --collect-all tree_sitter_html \
-            --collect-all tree_sitter_java \
-            --collect-all tree_sitter_javascript \
-            --collect-all tree_sitter_json \
-            --collect-all tree_sitter_markdown \
-            --collect-all tree_sitter_python \
-            --collect-all tree_sitter_regex \
-            --collect-all tree_sitter_rust \
-            --collect-all tree_sitter_sql \
-            --collect-all tree_sitter_toml \
-            --collect-all tree_sitter_xml \
-            --collect-all tree_sitter_yaml \
             ./restiny/__main__.py
 
       - name: Upload executables
