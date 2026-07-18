@@ -12,7 +12,8 @@ from restiny.data.repos import (
     SettingsSQLRepo,
 )
 from restiny.entities import Settings
-from restiny.themes import dark_amber, light_amber, system
+from restiny.themes import dark, light
+from restiny.widgets.color_picker import ColorPicker
 
 
 class SettingsScreen(QWidget):
@@ -21,26 +22,32 @@ class SettingsScreen(QWidget):
         self.app = app
         self.settings_repo = settings_repo
 
-        self.theme_label = QLabel()
-        self.theme_label.setText('Theme')
+        self.theme_label = QLabel('Theme')
         self.theme_combo_box = QComboBox()
-        self.theme_combo_box.addItems(['system', 'dark-amber', 'light-amber'])
+        self.theme_combo_box.addItems(['dark', 'light'])
 
-        self.save_button = QPushButton()
-        self.save_button.setText('Save')
+        self.accent_color_label = QLabel('Accent color')
+        self.accent_color_picker = ColorPicker()
+
+        self.save_button = QPushButton('Save')
 
         first_row = QHBoxLayout()
         first_row.addWidget(self.theme_label)
         first_row.addWidget(self.theme_combo_box, 1)
 
         second_row = QHBoxLayout()
-        second_row.addStretch()
-        second_row.addWidget(self.save_button)
+        second_row.addWidget(self.accent_color_label)
+        second_row.addWidget(self.accent_color_picker)
+
+        third_row = QHBoxLayout()
+        third_row.addStretch()
+        third_row.addWidget(self.save_button)
 
         layout = QVBoxLayout(self)
         layout.addLayout(first_row)
-        layout.addStretch()
         layout.addLayout(second_row)
+        layout.addStretch()
+        layout.addLayout(third_row)
 
         self.save_button.clicked.connect(self._on_save)
 
@@ -49,17 +56,20 @@ class SettingsScreen(QWidget):
     def _populate(self) -> None:
         settings = self.settings_repo.get().data
         self.theme_combo_box.setCurrentText(settings.theme)
+        self.accent_color_picker.set_color(settings.accent_color)
 
     def _on_save(self) -> None:
-        if self.theme_combo_box.currentText() == 'system':
-            system(self.app)
-        elif self.theme_combo_box.currentText() == 'dark-amber':
-            dark_amber(self.app)
-        elif self.theme_combo_box.currentText() == 'light-amber':
-            light_amber(self.app)
+        accent_color = self.accent_color_picker.get_color()
+        if self.theme_combo_box.currentText() == 'dark':
+            dark(accent_color=accent_color)
+        elif self.theme_combo_box.currentText() == 'light':
+            light(accent_color=accent_color)
 
         resp = self.settings_repo.set(
-            settings=Settings(theme=self.theme_combo_box.currentText())
+            settings=Settings(
+                theme=self.theme_combo_box.currentText(),
+                accent_color=accent_color,
+            )
         )
         if not resp.ok:
             msg = QMessageBox(self)

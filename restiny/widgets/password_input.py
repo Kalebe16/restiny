@@ -13,7 +13,6 @@ class PasswordInput(QWidget):
 
         self.toggle_button = QPushButton('show')
         self.toggle_button.setCheckable(True)
-        self.toggle_button.setFixedWidth(50)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

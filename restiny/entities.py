@@ -485,7 +485,8 @@ class Environment(BaseModel):
 class Settings(BaseModel):
     id: int | None = None
 
-    theme: str = 'system'
+    theme: str = 'dark'
+    accent_color: str = '#99c1f1'
 
     created_at: datetime | None = None
     updated_at: datetime | None = None

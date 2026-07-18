@@ -15,7 +15,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from PySide6.QtCore import QSize, QTimer
+from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -29,8 +29,6 @@ from PySide6.QtWidgets import (
     QStackedWidget,
     QToolBar,
     QToolButton,
-    QTreeWidget,
-    QTreeWidgetItem,
     QWidget,
 )
 
@@ -381,19 +379,23 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(export_button)
         self.addToolBar(toolbar)
 
-        self.sidebar = QTreeWidget()
-        self.sidebar.setHeaderHidden(True)
-        self.sidebar.setIconSize(QSize(32, 32))
-        collections_item = QTreeWidgetItem(['Collections'])
-        collections_item.setIcon(0, QIcon(str(COLLECTIONS_ICON)))
-        environments_item = QTreeWidgetItem(['Environments'])
-        environments_item.setIcon(0, QIcon(str(ENVIRONMENTS_ICON)))
-        settings_item = QTreeWidgetItem(['Settings'])
-        settings_item.setIcon(0, QIcon(str(SETTINGS_ICON)))
-        self.sidebar.addTopLevelItems(
-            [collections_item, environments_item, settings_item]
+        sidebar = QToolBar('Sidebar')
+        sidebar.setIconSize(QSize(32, 32))
+        sidebar.setMovable(False)
+        collections_action = QAction(
+            QIcon(str(COLLECTIONS_ICON)), 'Collections', self
         )
-        self.sidebar.setCurrentItem(collections_item)
+        environments_action = QAction(
+            QIcon(str(ENVIRONMENTS_ICON)), 'Environments', self
+        )
+        settings_action = QAction(QIcon(str(SETTINGS_ICON)), 'Settings', self)
+        collections_action.triggered.connect(self._on_collections_clicked)
+        environments_action.triggered.connect(self._on_environments_clicked)
+        settings_action.triggered.connect(self._on_settings_clicked)
+        sidebar.addAction(collections_action)
+        sidebar.addAction(environments_action)
+        sidebar.addAction(settings_action)
+        self.addToolBar(Qt.LeftToolBarArea, sidebar)
 
         self.collections_screen = CollectionsScreen(
             main_window=self,
@@ -415,11 +417,10 @@ class MainWindow(QMainWindow):
 
         container = QWidget()
         layout = QHBoxLayout(container)
-        layout.addWidget(self.sidebar, 1)
+        layout.addWidget(sidebar, 1)
         layout.addWidget(self.stack, 12)
         self.setCentralWidget(container)
 
-        self.sidebar.currentItemChanged.connect(self._on_item_changed)
         self.environments_screen.sig_environment_added.connect(
             self.collections_screen.top_bar_area._populate_environments
         )
@@ -431,11 +432,14 @@ class MainWindow(QMainWindow):
         )
         QTimer.singleShot(3000, self._check_new_release)
 
-    def _on_item_changed(self, current, previous):
-        if not current:
-            return
-        index = self.sidebar.indexOfTopLevelItem(current)
-        self.stack.setCurrentIndex(index)
+    def _on_collections_clicked(self) -> None:
+        self.stack.setCurrentIndex(0)
+
+    def _on_environments_clicked(self) -> None:
+        self.stack.setCurrentIndex(1)
+
+    def _on_settings_clicked(self) -> None:
+        self.stack.setCurrentIndex(2)
 
     def _check_new_release(self) -> None:
         try:

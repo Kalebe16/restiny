@@ -482,8 +482,10 @@ class SettingsSQLRepo(SQLRepoBase):
     @safe_repo
     def get(self, session: Session | None = None) -> RepoResp[Settings]:
         with self._ensure_session(session) as session:
-            sql_settings = session.scalar(select(SQLSettings).limit(1))
-
+            try:
+                sql_settings = session.scalar(select(SQLSettings).limit(1))
+            except Exception as error:
+                print(error)
             if not sql_settings:
                 return RepoResp(data=Settings())
 
@@ -515,14 +517,13 @@ class SettingsSQLRepo(SQLRepoBase):
 
     @property
     def _updatable_sql_fields(self) -> list[str]:
-        return [
-            SQLSettings.theme.key,
-        ]
+        return [SQLSettings.theme.key, SQLSettings.accent_color.key]
 
     def _sql_to_settings(self, sql_settings: SQLSettings) -> Settings:
         return Settings(
             id=sql_settings.id,
             theme=sql_settings.theme,
+            accent_color=sql_settings.accent_color,
             created_at=sql_settings.created_at.replace(tzinfo=UTC),
             updated_at=sql_settings.updated_at.replace(tzinfo=UTC),
         )
@@ -531,6 +532,7 @@ class SettingsSQLRepo(SQLRepoBase):
         return SQLSettings(
             id=settings.id,
             theme=settings.theme,
+            accent_color=settings.accent_color,
             created_at=settings.created_at,
             updated_at=settings.updated_at,
         )

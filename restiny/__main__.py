@@ -4,7 +4,7 @@ import subprocess
 import sys
 
 import qasync
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QComboBox, QListView
 
 from restiny.data.db import DBManager
 from restiny.data.repos import (
@@ -13,7 +13,7 @@ from restiny.data.repos import (
     RequestsSQLRepo,
     SettingsSQLRepo,
 )
-from restiny.themes import dark_amber, light_amber, system
+from restiny.themes import dark, light
 from restiny.ui.app import MainWindow
 
 
@@ -62,13 +62,10 @@ def main() -> None:
 
     settings_repo = SettingsSQLRepo(db_manager=db_manager)
     settings = settings_repo.get().data
-
-    if settings.theme == 'system':
-        system(app)
-    elif settings.theme == 'dark-amber':
-        dark_amber(app)
-    elif settings.theme == 'light-amber':
-        light_amber(app)
+    if settings.theme == 'dark':
+        dark(accent_color=settings.accent_color)
+    elif settings.theme == 'light':
+        light(accent_color=settings.accent_color)
 
     window = MainWindow(
         app=app,
@@ -79,6 +76,11 @@ def main() -> None:
         settings_repo=settings_repo,
     )
     window.show()
+
+    # Fix combobox
+    for combo in window.findChildren(QComboBox):
+        view = QListView(combo)
+        combo.setView(view)
 
     with loop:
         loop.run_forever()
