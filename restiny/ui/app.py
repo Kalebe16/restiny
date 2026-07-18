@@ -843,8 +843,8 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            exported_environment_file = ExportedEnvironmentFileV1.model_validate(
-                data
+            exported_environment_file = (
+                ExportedEnvironmentFileV1.model_validate(data)
             )
         except ValidationError as error:
             QMessageBox.critical(
