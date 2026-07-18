@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.0.0] - 2026-07-18
+
+### Added
+- Collections tree with context menus for adding, renaming, moving, and deleting items
+- Top bar area with request tabs
+- Draft request automatically created on first run
+
+### Changed
+- Replaced **Textual** with **PySide** as the main UI framework
+
 ## [0.14.2] - 2026-03-05
 
 ### Fixed

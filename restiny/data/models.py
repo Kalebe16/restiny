@@ -12,6 +12,7 @@ class SQLFolder(SQLModelBase):
     __tablename__ = 'folders'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    uuid: Mapped[str] = mapped_column(nullable=False)
     name: Mapped[str] = mapped_column(nullable=False)
     parent_id: Mapped[int | None] = mapped_column(
         ForeignKey('folders.id'), nullable=True
@@ -35,8 +36,9 @@ class SQLRequest(SQLModelBase):
     __tablename__ = 'requests'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    uuid: Mapped[str] = mapped_column(nullable=False)
     folder_id: Mapped[int] = mapped_column(
-        ForeignKey('folders.id'), nullable=False
+        ForeignKey('folders.id'), nullable=True
     )
     name: Mapped[str] = mapped_column(nullable=False)
 
@@ -71,14 +73,13 @@ class SQLRequest(SQLModelBase):
     )
 
 
-class SQLSettings(SQLModelBase):
-    __tablename__ = 'settings'
+class SQLEnvironment(SQLModelBase):
+    __tablename__ = 'environments'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    theme: Mapped[str] = mapped_column(nullable=False)
-    editor_theme: Mapped[str] = mapped_column(nullable=False)
-    editor_indent: Mapped[int] = mapped_column(nullable=False)
+    name: Mapped[str] = mapped_column(nullable=False, unique=True)
+    variables: Mapped[str] = mapped_column(nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(),
@@ -93,13 +94,12 @@ class SQLSettings(SQLModelBase):
     )
 
 
-class SQLEnvironment(SQLModelBase):
-    __tablename__ = 'environments'
+class SQLSettings(SQLModelBase):
+    __tablename__ = 'settings'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    name: Mapped[str] = mapped_column(nullable=False, unique=True)
-    variables: Mapped[str] = mapped_column(nullable=False)
+    theme: Mapped[str] = mapped_column(nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(),

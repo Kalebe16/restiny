@@ -1,389 +1,195 @@
-from __future__ import annotations
-
-from abc import abstractmethod
-from enum import StrEnum
 from pathlib import Path
+from typing import Literal
 
-from textual import on
-from textual.app import ComposeResult
-from textual.containers import VerticalScroll
-from textual.message import Message
-from textual.widget import Widget
-from textual.widgets import (
-    Button,
-    ContentSwitcher,
-    RadioButton,
-    RadioSet,
-    Switch,
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QFileDialog,
+    QFrame,
+    QHBoxLayout,
+    QLineEdit,
+    QPushButton,
+    QRadioButton,
+    QScrollArea,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
-from restiny.widgets import CustomInput
-from restiny.widgets.path_chooser import PathChooser
 
+class TextDynamicField(QWidget):
+    sig_enabled = Signal()
+    sig_disabled = Signal()
+    sig_empty = Signal()
+    sig_filled = Signal()
+    sig_remove_requested = Signal()
+    sig_edited = Signal()
 
-class DynamicField(Widget):
-    @abstractmethod
-    def compose(self) -> ComposeResult: ...
+    def __init__(self, enabled: bool = False, key: str = '', value: str = ''):
+        super().__init__()
+        self.initial_enabled = enabled
+        self.initial_key = key
+        self.initial_value = value
 
-    @property
-    @abstractmethod
-    def enabled(self) -> bool: ...
+        self.enable_checkbox = QCheckBox()
+        self.enable_checkbox.toggled.connect(self._on_enabled_or_disabled)
+        self.enable_checkbox.setToolTip('Enable')
+        self.enable_checkbox.setStyleSheet("""
+QCheckBox::indicator {
+    width: 20px;
+    height: 20px;
+}
+""")
+        self.enable_checkbox.setChecked(self.initial_enabled)
+        self.key_input = QLineEdit()
+        self.key_input.setPlaceholderText('Key')
+        self.key_input.textEdited.connect(self._on_edited)
+        self.key_input.setText(self.initial_key)
+        self.value_input = QLineEdit()
+        self.value_input.setPlaceholderText('Value')
+        self.value_input.textEdited.connect(self._on_edited)
+        self.value_input.setText(self.initial_value)
+        self.remove_button = QPushButton()
+        self.remove_button.setText('Remove')
+        self.remove_button.setFocusPolicy(Qt.TabFocus | Qt.ClickFocus)
+        self.remove_button.clicked.connect(self._on_remove_requested)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 8)
+        layout.addWidget(self.enable_checkbox)
+        layout.addWidget(self.key_input)
+        layout.addWidget(self.value_input)
+        layout.addWidget(self.remove_button)
 
-    @enabled.setter
-    @abstractmethod
-    def enabled(self, value: bool) -> None: ...
-
-    @property
-    @abstractmethod
-    def key(self) -> str: ...
-
-    @key.setter
-    @abstractmethod
-    def key(self, value: str) -> None: ...
-
-    @property
-    @abstractmethod
-    def value(self) -> str | Path | None: ...
-
-    @value.setter
-    @abstractmethod
-    def value(self, value: str | Path | None) -> None: ...
-
-    @property
-    @abstractmethod
-    def is_empty(self) -> bool: ...
-
-    @property
-    @abstractmethod
-    def is_filled(self) -> bool: ...
-
-    class Enabled(Message):
-        """
-        Sent when the user enables the field.
-        """
-
-        def __init__(self, field: DynamicField) -> None:
-            super().__init__()
-            self.field = field
-
-        @property
-        def control(self) -> DynamicField:
-            return self.field
-
-    class Disabled(Message):
-        """
-        Sent when the user disables the field.
-        """
-
-        def __init__(self, field: DynamicField) -> None:
-            super().__init__()
-            self.field = field
-
-        @property
-        def control(self) -> DynamicField:
-            return self.field
-
-    class Empty(Message):
-        """
-        Sent when the key input and value input is empty.
-        """
-
-        def __init__(self, field: DynamicField) -> None:
-            super().__init__()
-            self.field = field
-
-        @property
-        def control(self) -> DynamicField:
-            return self.field
-
-    class Filled(Message):
-        """
-        Sent when the key input or value input is filled.
-        """
-
-        def __init__(self, field: DynamicField) -> None:
-            super().__init__()
-            self.field = field
-
-        @property
-        def control(self) -> DynamicField:
-            return self.field
-
-    class RemoveRequested(Message):
-        """
-        Sent when the user clicks the remove button.
-        The listener of this event decides whether
-        to actually remove the field or not.
-        """
-
-        def __init__(self, field: DynamicField) -> None:
-            super().__init__()
-            self.field = field
-
-        @property
-        def control(self) -> DynamicField:
-            return self.field
-
-
-class TextDynamicField(DynamicField):
-    """
-    Enableable and removable field
-    """
-
-    DEFAULT_CSS = """
-    TextDynamicField {
-        width: 100%;
-        height: auto;
-        layout: grid;
-        grid-size: 4 1;
-        grid-columns: auto 1fr 2fr auto; /* Set 1:2 ratio between Inputs */
-    }
-    """
-
-    def __init__(
-        self, enabled: bool, key: str, value: str, *args, **kwargs
-    ) -> None:
-        super().__init__(*args, **kwargs)
-        self._enabled = enabled
-        self._key = key
-        self._value = value
-
-    def compose(self) -> ComposeResult:
-        yield Switch(
-            value=self._enabled,
-            tooltip='Send this field?',
-            id='enabled',
-        )
-        yield CustomInput(
-            value=self._key,
-            placeholder='Key',
-            select_on_focus=False,
-            id='key',
-        )
-        yield CustomInput(
-            value=self._value,
-            placeholder='Value',
-            select_on_focus=False,
-            id='value',
-        )
-        yield Button(label='➖', tooltip='Remove field', id='remove')
-
-    def on_mount(self) -> None:
-        self.enabled_switch = self.query_one('#enabled', Switch)
-        self.key_input = self.query_one('#key', CustomInput)
-        self.value_input = self.query_one('#value', CustomInput)
-        self.remove_button = self.query_one('#remove', Button)
-
-    @property
-    def enabled(self) -> bool:
-        return self.enabled_switch.value
-
-    @enabled.setter
-    def enabled(self, value: bool) -> None:
-        self.enabled_switch.value = value
-
-    @property
-    def key(self) -> str:
-        return self.key_input.value
-
-    @key.setter
-    def key(self, value: str) -> None:
-        self.key_input.value = value
-
-    @property
-    def value(self) -> str:
-        return self.value_input.value
-
-    @value.setter
-    def value(self, value: str) -> None:
-        self.value_input.value = value
+        self.enable_checkbox.toggled.connect(lambda: self.sig_edited.emit())
+        self.key_input.textEdited.connect(lambda: self.sig_edited.emit())
+        self.value_input.textEdited.connect(lambda: self.sig_edited.emit())
 
     @property
     def is_filled(self) -> bool:
-        return len(self.key_input.value) > 0 or len(self.value_input.value) > 0
+        return self.key_input.text() or self.value_input.text()
 
     @property
     def is_empty(self) -> bool:
         return not self.is_filled
 
-    @on(Switch.Changed, '#enabled')
-    def on_enabled_or_disabled(self, message: Switch.Changed) -> None:
-        if message.value is True:
-            self.post_message(self.Enabled(field=self))
-        elif message.value is False:
-            self.post_message(message=self.Disabled(field=self))
+    def get_data(self) -> dict:
+        return dict(
+            enabled=self.enable_checkbox.isChecked(),
+            key=self.key_input.text(),
+            value=self.value_input.text(),
+        )
 
-    @on(CustomInput.Changed, '#key')
-    @on(CustomInput.Changed, '#value')
-    def on_input_changed(self, message: CustomInput.Changed) -> None:
+    def clear_data(self) -> None:
+        self.enable_checkbox.setChecked(False)
+        self.key_input.setText('')
+        self.value_input.setText('')
+
+    def _on_enabled_or_disabled(self, checked: bool) -> None:
+        if checked:
+            self.sig_enabled.emit()
+        else:
+            self.sig_disabled.emit()
+
+    def _on_edited(self) -> None:
         if self.is_empty:
-            self.post_message(message=self.Empty(field=self))
-        elif self.is_filled:
-            self.post_message(message=self.Filled(field=self))
+            self.sig_empty.emit()
+        else:
+            self.sig_filled.emit()
 
-    @on(Button.Pressed, '#remove')
-    def on_remove_requested(self, message: Button.Pressed) -> None:
-        self.post_message(self.RemoveRequested(field=self))
-
-
-class _ValueKind(StrEnum):
-    TEXT = 'text'
-    FILE = 'file'
+    def _on_remove_requested(self) -> None:
+        self.sig_remove_requested.emit()
 
 
-class TextOrFileDynamicField(DynamicField):
-    DEFAULT_CSS = """
-    TextOrFileDynamicField {
-        width: 100%;
-        height: auto;
-        layout: grid;
-        grid-size: 5 1;
-        grid-columns: auto auto 1fr 2fr auto; /* Set 1:2 ratio between Inputs */
-    }
-
-    TextOrFileDynamicField > RadioSet > RadioButton.-selected {
-        background: $surface;
-    }
-
-    TextOrFileDynamicField > ContentSwitcher > PathChooser{
-        margin-right: 1;
-    }
-    """
+class TextOrFileDynamicField(QWidget):
+    sig_enabled = Signal()
+    sig_disabled = Signal()
+    sig_empty = Signal()
+    sig_filled = Signal()
+    sig_remove_requested = Signal()
+    sig_edited = Signal()
 
     def __init__(
         self,
         enabled: bool = False,
         key: str = '',
         value: str | Path | None = '',
-        value_kind: _ValueKind = _ValueKind.TEXT,
-        *args,
-        **kwargs,
-    ) -> None:
-        super().__init__(*args, **kwargs)
-        self._enabled = enabled
-        self._key = key
-        self._value = value
-        self._value_kind = value_kind
+        value_kind: Literal['text', 'file'] = 'text',
+    ):
+        super().__init__()
+        self.initial_enabled = enabled
+        self.initial_key = key
+        self.initial_value = value
+        self.initial_value_kind = value_kind
 
-    def compose(self) -> ComposeResult:
-        with RadioSet(id='value-kind', compact=True):
-            yield RadioButton(
-                label=_ValueKind.TEXT,
-                value=bool(self._value_kind == _ValueKind.TEXT),
-                id='value-kind-text',
-            )
-            yield RadioButton(
-                label=_ValueKind.FILE,
-                value=bool(self._value_kind == _ValueKind.FILE),
-                id='value-kind-file',
-            )
-        yield Switch(
-            value=self._enabled,
-            tooltip='Send this field?',
-            id='enabled',
-        )
-        yield CustomInput(
-            value=self._key,
-            placeholder='Key',
-            select_on_focus=False,
-            id='key',
-        )
-        with ContentSwitcher(
-            initial='value-text'
-            if self._value_kind == _ValueKind.TEXT
-            else 'value-file',
-            id='value-kind-switcher',
-        ):
-            yield CustomInput(
-                value=self._value
-                if self._value_kind == _ValueKind.TEXT
-                else '',
-                placeholder='Value',
-                select_on_focus=False,
-                id='value-text',
-            )
-            yield PathChooser.file(
-                path=self._value
-                if self._value_kind == _ValueKind.FILE
-                else None,
-                id='value-file',
-            )
-        yield Button(label='➖', tooltip='Remove field', id='remove')
+        self.text_radio = QRadioButton('Text')
+        self.file_radio = QRadioButton('File')
+        self.text_radio.setChecked(True)
+        self.text_radio.toggled.connect(self._on_text_kind_selected)
+        self.file_radio.toggled.connect(self._on_file_kind_selected)
 
-    def on_mount(self) -> None:
-        self.value_kind_switcher = self.query_one(
-            '#value-kind-switcher', ContentSwitcher
-        )
+        self.enable_checkbox = QCheckBox()
+        self.enable_checkbox.setChecked(self.initial_enabled)
+        self.enable_checkbox.setToolTip('Enable')
+        self.enable_checkbox.setStyleSheet("""
+QCheckBox::indicator {
+    width: 20px;
+    height: 20px;
+}
+""")
+        self.enable_checkbox.toggled.connect(self._on_enabled_or_disabled)
 
-        self.value_kind_radioset = self.query_one('#value-kind', RadioSet)
-        self.value_kind_text_radio_button = self.query_one(
-            '#value-kind-text', RadioButton
-        )
-        self.value_kind_file_radio_button = self.query_one(
-            '#value-kind-file', RadioButton
-        )
-        self.enabled_switch = self.query_one('#enabled', Switch)
-        self.key_input = self.query_one('#key', CustomInput)
-        self.value_text_input = self.query_one('#value-text', CustomInput)
-        self.value_file_input = self.query_one('#value-file', PathChooser)
-        self.remove_button = self.query_one('#remove', Button)
+        self.key_input = QLineEdit(self.initial_key)
+        self.key_input.setPlaceholderText('Key')
+        self.key_input.textEdited.connect(self._on_edited)
 
-    @property
-    def enabled(self) -> bool:
-        return self.enabled_switch.value
+        self.value_input = QLineEdit(self.initial_value)
+        self.value_input.setPlaceholderText('Value')
+        self.value_input.textEdited.connect(self._on_edited)
 
-    @enabled.setter
-    def enabled(self, value: bool) -> None:
-        self.enabled_switch.value = value
+        self.file_input = QLineEdit()
+        self.file_input.setReadOnly(True)
 
-    @property
-    def key(self) -> str:
-        return self.key_input.value
+        self.file_button = QPushButton('Browse')
+        self.file_button.clicked.connect(self._on_select_file)
 
-    @key.setter
-    def key(self, value: str) -> None:
-        self.key_input.value = value
+        file_widget = QWidget()
+        file_layout = QHBoxLayout(file_widget)
+        file_layout.setContentsMargins(0, 0, 0, 0)
+        file_layout.addWidget(self.file_input)
+        file_layout.addWidget(self.file_button)
 
-    @property
-    def value(self) -> str | Path | None:
-        if self.value_kind == _ValueKind.TEXT:
-            return self.value_text_input.value
-        elif self.value_kind == _ValueKind.FILE:
-            return self.value_file_input.path
+        self.value_stack = QStackedWidget()
+        self.value_stack.addWidget(self.value_input)
+        self.value_stack.addWidget(file_widget)
+        self.value_stack.setFixedHeight(self.value_input.sizeHint().height())
 
-    @value.setter
-    def value(self, value: str | Path | None) -> None:
-        if isinstance(value, str):
-            self.value_text_input.value = value
-        elif isinstance(value, Path) or value is None:
-            self.value_file_input.path = value
+        self.remove_button = QPushButton('Remove')
+        self.remove_button.setFocusPolicy(Qt.ClickFocus)
+        self.remove_button.clicked.connect(self._on_remove_requested)
 
-    @property
-    def value_kind(self) -> _ValueKind:
-        return _ValueKind(self.value_kind_radioset.pressed_button.label)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 8)
+        layout.addWidget(self.text_radio)
+        layout.addWidget(self.file_radio)
+        layout.addWidget(self.enable_checkbox)
+        layout.addWidget(self.key_input)
+        layout.addWidget(self.value_stack)
+        layout.addWidget(self.remove_button)
 
-    @value_kind.setter
-    def value_kind(self, value: _ValueKind) -> None:
-        if value == _ValueKind.TEXT:
-            self.value_kind_switcher.current = 'value-text'
-            self.value_kind_text_radio_button.value = True
-        elif value == _ValueKind.FILE:
-            self.value_kind_switcher.current = 'value-file'
-            self.value_kind_file_radio_button.value = True
+        self.file_radio.toggled.connect(lambda: self.sig_edited.emit())
+        self.text_radio.toggled.connect(lambda: self.sig_edited.emit())
+        self.enable_checkbox.toggled.connect(lambda: self.sig_edited.emit())
+        self.key_input.textEdited.connect(lambda: self.sig_edited.emit())
+        self.value_input.textEdited.connect(lambda: self.sig_edited.emit())
+        self.file_input.textEdited.connect(lambda: self.sig_edited.emit())
 
     @property
     def is_filled(self) -> bool:
-        if len(self.key_input.value) > 0:
+        if self.key_input.text():
             return True
-        elif (
-            self.value_kind == _ValueKind.TEXT
-            and len(self.value_text_input.value) > 0
-        ):
+        elif self.text_radio.isChecked() and self.value_input.text():
             return True
-        elif (
-            self.value_kind == _ValueKind.FILE
-            and self.value_file_input.path is not None
-        ):
+        elif self.file_radio.isChecked() and self.file_input.text():
             return True
         else:
             return False
@@ -392,166 +198,221 @@ class TextOrFileDynamicField(DynamicField):
     def is_empty(self) -> bool:
         return not self.is_filled
 
-    @on(RadioSet.Changed, '#value-kind')
-    def on_value_kind_changed(self, message: RadioSet.Changed) -> None:
-        self.value_kind = _ValueKind(message.pressed.label)
+    def get_data(self) -> dict:
+        if self.file_radio.isChecked():
+            value_kind = 'file'
+            value = self.file_input.text()
+        elif self.text_radio.isChecked():
+            value_kind = 'text'
+            value = self.value_input.text()
 
-    @on(Switch.Changed, '#enabled')
-    def on_enabled_or_disabled(self, message: Switch.Changed) -> None:
-        if message.value is True:
-            self.post_message(self.Enabled(field=self))
-        elif message.value is False:
-            self.post_message(message=self.Disabled(field=self))
+        return dict(
+            enabled=self.enable_checkbox.isChecked(),
+            key=self.key_input.text(),
+            value=value,
+            value_kind=value_kind,
+        )
 
-    @on(CustomInput.Changed, '#key')
-    @on(CustomInput.Changed, '#value-text')
-    @on(PathChooser.Changed, '#value-file')
-    def on_input_changed(
-        self, message: CustomInput.Changed | PathChooser.Changed
-    ) -> None:
+    def clear_data(self) -> None:
+        self.text_radio.setChecked(True)
+        self.file_radio.setChecked(False)
+        self.enable_checkbox.setChecked(False)
+        self.key_input.setText('')
+        self.value_input.setText('')
+        self.file_input.setText('')
+
+    def _on_enabled_or_disabled(self, checked: bool) -> None:
+        if checked:
+            self.sig_enabled.emit()
+        else:
+            self.sig_disabled.emit()
+
+    def _on_edited(self) -> None:
         if self.is_empty:
-            self.post_message(message=self.Empty(field=self))
-        elif self.is_filled:
-            self.post_message(message=self.Filled(field=self))
+            self.sig_empty.emit()
+        else:
+            self.sig_filled.emit()
 
-    @on(Button.Pressed, '#remove')
-    def on_remove_requested(self, message: Button.Pressed) -> None:
-        self.post_message(self.RemoveRequested(field=self))
+    def _on_remove_requested(self) -> None:
+        self.sig_remove_requested.emit()
+
+    def _on_text_kind_selected(self, checked: bool) -> None:
+        if not checked:
+            return
+
+        self.value_stack.setCurrentIndex(0)
+
+    def _on_file_kind_selected(self, checked: bool) -> None:
+        if not checked:
+            return
+
+        self.value_stack.setCurrentIndex(1)
+
+    def _on_select_file(self) -> None:
+        filename, _ = QFileDialog.getOpenFileName(self, 'Select file')
+
+        if not filename:
+            return
+
+        self.file_input.setText(filename)
+        self._on_edited()
 
 
-class DynamicFields(Widget):
-    """
-    Enableable and removable fields
-    """
-
-    DEFAULT_CSS = """
-    DynamicFields {
-        width: auto;
-        height: 1fr;
-    }
-    """
-
-    class FieldEmpty(Message):
-        """
-        Sent when one of the fields becomes empty.
-        """
-
-        def __init__(self, fields: DynamicFields, field: DynamicField) -> None:
-            super().__init__()
-            self.fields = fields
-            self.field = field
-
-        @property
-        def control(self) -> DynamicFields:
-            return self.fields
-
-    class FieldFilled(Message):
-        """
-        Sent when one of the fields becomes filled.
-        """
-
-        def __init__(self, fields: DynamicFields, field: DynamicField) -> None:
-            super().__init__()
-            self.fields = fields
-            self.field = field
-
-        @property
-        def control(self) -> DynamicFields:
-            return self.fields
+class DynamicFields(QWidget):
+    sig_edited = Signal()
 
     def __init__(
         self,
-        fields: list[DynamicField],
-        *args,
-        **kwargs,
+        fields: list[TextDynamicField | TextOrFileDynamicField],
     ) -> None:
-        super().__init__(*args, **kwargs)
-        self._fields = fields
+        super().__init__()
 
-    def compose(self) -> ComposeResult:
-        with VerticalScroll(can_focus=False):
-            yield from self._fields
+        self.initial_fields = fields
 
-    def on_mount(self) -> None:
-        self.fields_container = self.query_one(VerticalScroll)
-
-    @property
-    def fields(self) -> list[DynamicField]:
-        return list(
-            field for field in self.query(DynamicField) if field.is_mounted
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
 
-    @property
-    def empty_fields(self) -> list[DynamicField]:
-        return [field for field in self.fields if field.is_empty]
+        inner = QWidget()
+
+        self.layout = QVBoxLayout(inner)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(0)
+        self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self.scroll.setWidget(inner)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.scroll)
+
+        field_type = type(fields[0])
+
+        for field in fields:
+            self.add_field(field)
+            field.sig_edited.connect(self.sig_edited)
+
+        if not self.fields or self.fields[-1].is_filled:
+            self.add_field(field_type())
 
     @property
-    def filled_fields(self) -> list[DynamicField]:
-        return [field for field in self.fields if field.is_filled]
+    def fields(self) -> list[TextDynamicField | TextOrFileDynamicField]:
+        return [
+            self.layout.itemAt(index).widget()
+            for index in range(self.layout.count())
+        ]
 
-    async def add_field(
-        self, field: DynamicField, before_last: bool = False
+    def add_field(
+        self,
+        field: TextDynamicField | TextOrFileDynamicField,
     ) -> None:
-        if before_last:
-            await self.fields_container.mount(field, before=self.fields[-1])
+        field.sig_empty.connect(lambda: self.remove_field(field))
+        field.sig_filled.connect(self.ensure_empty_field)
+        field.sig_filled.connect(
+            lambda: field.enable_checkbox.setChecked(True)
+        )
+        field.sig_remove_requested.connect(lambda: self.remove_field(field))
+        if self.fields and self.fields[-1].is_empty:
+            self.layout.insertWidget(self.layout.count() - 1, field)
         else:
-            await self.fields_container.mount(field)
+            self.layout.addWidget(field)
+        QTimer.singleShot(0, self._update_tab_order)
+
+    def ensure_empty_field(self) -> None:
+        field_type = type(self.fields[0])
+        if all(field.is_filled for field in self.fields):
+            self.add_field(field_type())
 
     def remove_field(
-        self, field: DynamicField, focus_neighbor: bool = False
+        self,
+        field: TextDynamicField | TextOrFileDynamicField,
     ) -> None:
-        if len(self.fields) == 1:
-            self.app.bell()
-            return
-        elif field is self.fields[-1]:
-            self.app.bell()
+        if field is self.fields[-1]:
             return
 
-        if focus_neighbor:
-            field_index = self.fields.index(field)
+        to_focus = 'key_input'
+        if field.key_input.hasFocus():
+            to_focus = 'key_input'
+        elif field.value_input.hasFocus():
+            to_focus = 'value_input'
+        elif hasattr(field, 'file_input') and field.file_input.hasFocus():
+            to_focus = 'file_input'
+        elif hasattr(field, 'file_button') and field.file_button.hasFocus():
+            to_focus = 'file_button'
 
-            neighbor_field = None
-            if field_index == 0:
-                neighbor_field = self.fields[field_index + 1]
+        if field is self.fields[-2]:
+            if to_focus == 'key_input':
+                self.fields[-1].key_input.setFocus()
+            elif to_focus == 'value_input':
+                self.fields[-1].value_input.setFocus()
+            elif to_focus == 'file_input':
+                self.fields[-1].file_input.setFocus()
+            elif to_focus == 'file_button':
+                self.fields[-1].file_button.setFocus()
+        else:
+            if to_focus == 'key_input':
+                self.fields[self.fields.index(field) + 1].key_input.setFocus()
+            elif to_focus == 'value_input':
+                self.fields[
+                    self.fields.index(field) + 1
+                ].value_input.setFocus()
+            elif to_focus == 'file_input':
+                self.fields[self.fields.index(field) + 1].file_input.setFocus()
+            elif to_focus == 'file_button':
+                self.fields[
+                    self.fields.index(field) + 1
+                ].file_button.setFocus()
+
+        self.layout.removeWidget(field)
+        field.deleteLater()
+        lambda: self.sig_edited.emit()()
+
+    def clear_data(self):
+        for field in self.fields:
+            field.clear_data()
+            self.remove_field(field)
+
+    def get_data(self) -> list[dict]:
+        return [field.get_data() for field in self.fields if field.is_filled]
+
+    # TODO: Refactor
+    def _update_tab_order(self) -> None:
+        fields = self.fields
+
+        for index, field in enumerate(fields):
+            is_text_or_file = isinstance(field, TextOrFileDynamicField)
+
+            if is_text_or_file:
+                QWidget.setTabOrder(field.text_radio, field.file_radio)
+                QWidget.setTabOrder(field.file_radio, field.enable_checkbox)
+
+            QWidget.setTabOrder(field.enable_checkbox, field.key_input)
+
+            if is_text_or_file:
+                if field.text_radio.isChecked():
+                    QWidget.setTabOrder(field.key_input, field.value_input)
+                    QWidget.setTabOrder(field.value_input, field.remove_button)
+                else:
+                    QWidget.setTabOrder(field.key_input, field.file_input)
+                    QWidget.setTabOrder(field.file_input, field.file_button)
+                    QWidget.setTabOrder(field.file_button, field.remove_button)
             else:
-                neighbor_field = self.fields[field_index - 1]
+                QWidget.setTabOrder(field.key_input, field.value_input)
+                QWidget.setTabOrder(field.value_input, field.remove_button)
 
-            self.app.set_focus(neighbor_field.query_one(CustomInput))
+            if index < len(fields) - 1:
+                next_field = fields[index + 1]
 
-        field.add_class('hidden')
-        field.remove()
-
-    @on(DynamicField.Empty)
-    def _on_field_is_empty(self, message: DynamicField.Empty) -> None:
-        self.remove_field(field=message.field, focus_neighbor=True)
-        self.post_message(
-            message=self.FieldEmpty(fields=self, field=message.field)
-        )
-
-    @on(DynamicField.Filled)
-    async def _on_field_is_filled(self, message: DynamicField.Filled) -> None:
-        if len(self.empty_fields) == 0:
-            field = message.field
-            if isinstance(field, TextDynamicField):
-                await self.add_field(
-                    TextDynamicField(enabled=False, key='', value='')
-                )
-            elif isinstance(field, TextOrFileDynamicField):
-                await self.add_field(
-                    TextOrFileDynamicField(
-                        enabled=False,
-                        key='',
-                        value='',
-                        value_kind=_ValueKind.TEXT,
+                if isinstance(next_field, TextOrFileDynamicField):
+                    QWidget.setTabOrder(
+                        field.remove_button,
+                        next_field.text_radio,
                     )
-                )
-
-        self.post_message(
-            message=self.FieldFilled(fields=self, field=message.field)
-        )
-
-    @on(DynamicField.RemoveRequested)
-    def _on_field_remove_requested(
-        self, message: DynamicField.RemoveRequested
-    ) -> None:
-        self.remove_field(field=message.field, focus_neighbor=True)
+                else:
+                    QWidget.setTabOrder(
+                        field.remove_button,
+                        next_field.enable_checkbox,
+                    )

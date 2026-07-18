@@ -22,7 +22,7 @@ class BodyMode(StrEnum):
 
 
 class BodyRawLanguage(StrEnum):
-    PLAIN = ''
+    PLAIN = 'plaintext'
     HTML = 'html'
     JSON = 'json'
     YAML = 'yaml'

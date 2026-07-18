@@ -14,7 +14,7 @@
 
 # RESTiny
 
-_A minimal, elegant HTTP client with a TUI interface — built with Python and powered by [Textual](https://github.com/Textualize/textual)._
+_A minimal, elegant HTTP client with a desktop interface — built with Python and powered by PySide._
 
 ![Showcase](https://raw.githubusercontent.com/kalebe16/restiny/main/showcase.png)
 

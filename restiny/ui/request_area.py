@@ -1,675 +1,622 @@
-from __future__ import annotations
-
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from textual import on
-from textual.app import ComposeResult
-from textual.containers import Container, Horizontal
-from textual.widgets import (
-    Button,
-    ContentSwitcher,
-    Label,
-    Rule,
-    Select,
-    Static,
-    Switch,
-    TabbedContent,
-    TabPane,
+from PySide6.QtCore import QLocale, Qt, Signal
+from PySide6.QtGui import QDoubleValidator
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QStackedWidget,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
+from qtmonaco import Monaco
 
 from restiny.enums import AuthMode, BodyMode, BodyRawLanguage
-from restiny.widgets import (
-    CustomInput,
-    CustomTextArea,
+from restiny.widgets.dynamic_fields import (
     DynamicFields,
-    PasswordInput,
-    PathChooser,
     TextDynamicField,
     TextOrFileDynamicField,
 )
-
-if TYPE_CHECKING:
-    from restiny.ui.app import RESTinyApp
+from restiny.widgets.password_input import PasswordInput
 
 
-class RequestArea(Static):
-    app: RESTinyApp
+class RequestArea(QWidget):
+    sig_edited = Signal()
 
-    ALLOW_MAXIMIZE = True
-    focusable = True
-    BORDER_TITLE = 'Request'
-    DEFAULT_CSS = """
-    RequestArea {
-        width: 1fr;
-        height: 1fr;
-        border: heavy $panel;
-        border-title-color: $text-muted;
-        padding: 1;
-    }
-    """
+    def __init__(self):
+        super().__init__()
 
-    def __init__(self, *args, **kwargs) -> None:
-        self._auth_clipboard: dict | None = None
-        super().__init__(*args, **kwargs)
+        # Tabs
+        self.tabs = QTabWidget()
+        headers_tab = QWidget()
+        params_tab = QWidget()
+        auth_tab = QWidget()
+        body_tab = QWidget()
+        options_tab = QWidget()
 
-    def compose(self) -> ComposeResult:
-        with TabbedContent():
-            with TabPane('Headers'):
-                yield DynamicFields(
-                    fields=[TextDynamicField(enabled=False, key='', value='')],
-                    id='headers',
-                )
-            with TabPane('Params'):
-                yield DynamicFields(
-                    fields=[TextDynamicField(enabled=False, key='', value='')],
-                    id='params',
-                )
-            with TabPane('Auth'):
-                with Horizontal(classes='h-auto'):
-                    yield Switch(tooltip='Enabled', id='auth-enabled')
-                    yield Select(
-                        (
-                            ('Basic', AuthMode.BASIC),
-                            ('Bearer', AuthMode.BEARER),
-                            ('API Key', AuthMode.API_KEY),
-                            ('Digest', AuthMode.DIGEST),
-                        ),
-                        allow_blank=False,
-                        tooltip='Auth mode',
-                        id='auth-mode',
-                    )
-                with ContentSwitcher(
-                    initial='auth-basic', id='auth-mode-switcher'
-                ):
-                    with Horizontal(id='auth-basic', classes='mt-1 h-auto'):
-                        yield CustomInput(
-                            placeholder='Username',
-                            select_on_focus=False,
-                            classes='w-1fr',
-                            id='auth-basic-username',
-                        )
-                        yield PasswordInput(
-                            placeholder='Password',
-                            select_on_focus=False,
-                            classes='w-2fr',
-                            id='auth-basic-password',
-                        )
-                    with Horizontal(id='auth-bearer', classes='mt-1 h-auto'):
-                        yield PasswordInput(
-                            placeholder='Token',
-                            select_on_focus=False,
-                            id='auth-bearer-token',
-                        )
-                    with Horizontal(id='auth-api-key', classes='mt-1 h-auto'):
-                        yield Select(
-                            (('Header', 'header'), ('Param', 'param')),
-                            allow_blank=False,
-                            tooltip='Where',
-                            classes='w-1fr',
-                            id='auth-api-key-where',
-                        )
-                        yield CustomInput(
-                            placeholder='Key',
-                            classes='w-2fr',
-                            id='auth-api-key-key',
-                        )
-                        yield PasswordInput(
-                            placeholder='Value',
-                            classes='w-3fr',
-                            id='auth-api-key-value',
-                        )
-
-                    with Horizontal(id='auth-digest', classes='mt-1 h-auto'):
-                        yield CustomInput(
-                            placeholder='Username',
-                            select_on_focus=False,
-                            classes='w-1fr',
-                            id='auth-digest-username',
-                        )
-                        yield PasswordInput(
-                            placeholder='Password',
-                            select_on_focus=False,
-                            classes='w-2fr',
-                            id='auth-digest-password',
-                        )
-
-                yield Rule()
-
-                with Horizontal(classes='ml-1 h-auto'):
-                    yield Button(
-                        label='Copy',
-                        flat=True,
-                        tooltip='Copy auth',
-                        id='copy-auth',
-                    )
-                    yield Button(
-                        label='Paste',
-                        flat=True,
-                        tooltip='Paste auth',
-                        id='paste-auth',
-                    )
-
-            with TabPane('Body'):
-                with Horizontal(classes='h-auto'):
-                    yield Switch(id='body-enabled', tooltip='Send body?')
-                    yield Select(
-                        (
-                            ('Raw', BodyMode.RAW),
-                            ('File', BodyMode.FILE),
-                            ('Form (urlencoded)', BodyMode.FORM_URLENCODED),
-                            ('Form (multipart)', BodyMode.FORM_MULTIPART),
-                        ),
-                        allow_blank=False,
-                        tooltip='Body mode',
-                        id='body-mode',
-                    )
-                with ContentSwitcher(
-                    id='body-mode-switcher',
-                    initial='body-mode-raw',
-                    classes='h-1fr',
-                ):
-                    with Container(id='body-mode-raw', classes='pt-1'):
-                        yield Select(
-                            (
-                                ('Plain', BodyRawLanguage.PLAIN),
-                                ('JSON', BodyRawLanguage.JSON),
-                                ('YAML', BodyRawLanguage.YAML),
-                                ('XML', BodyRawLanguage.XML),
-                                ('HTML', BodyRawLanguage.HTML),
-                            ),
-                            allow_blank=False,
-                            tooltip='Text type',
-                            id='body-raw-language',
-                        )
-                        yield CustomTextArea.code_editor(
-                            id='body-raw', classes='mt-1'
-                        )
-                    with Horizontal(
-                        id='body-mode-file', classes='h-auto mt-1'
-                    ):
-                        yield PathChooser.file(id='body-file')
-                    with Horizontal(
-                        id='body-mode-form-urlencoded', classes='h-auto mt-1'
-                    ):
-                        yield DynamicFields(
-                            [
-                                TextDynamicField(
-                                    enabled=False, key='', value=''
-                                )
-                            ],
-                            id='body-form-urlencoded',
-                        )
-                    with Horizontal(
-                        id='body-mode-form-multipart', classes='h-auto mt-1'
-                    ):
-                        yield DynamicFields(
-                            [
-                                TextOrFileDynamicField(
-                                    enabled=False, key='', value=''
-                                )
-                            ],
-                            id='body-form-multipart',
-                        )
-
-            with TabPane('Options'):
-                with Horizontal(classes='h-auto'):
-                    yield Label('Timeout', classes='pt-1 ml-1')
-                    yield CustomInput(
-                        '5.5',
-                        placeholder='5.5',
-                        select_on_focus=False,
-                        type='number',
-                        valid_empty=True,
-                        classes='w-1fr',
-                        id='options-timeout',
-                    )
-                with Horizontal(classes='mt-1 h-auto'):
-                    yield Switch(id='options-follow-redirects')
-                    yield Label('Follow redirects', classes='pt-1')
-                with Horizontal(classes='h-auto'):
-                    yield Switch(id='options-verify-ssl')
-                    yield Label('Verify SSL', classes='pt-1')
-                with Horizontal(classes='h-auto'):
-                    yield Switch(id='options-attach-cookies')
-                    yield Label(
-                        'Attach cookies (store and send)', classes='pt-1'
-                    )
-
-    def on_mount(self) -> None:
-        self.header_fields = self.query_one('#headers', DynamicFields)
-
-        self.param_fields = self.query_one('#params', DynamicFields)
-
-        self.auth_enabled_switch = self.query_one('#auth-enabled', Switch)
-        self.auth_mode_switcher = self.query_one(
-            '#auth-mode-switcher', ContentSwitcher
-        )
-        self.auth_mode_select = self.query_one('#auth-mode', Select)
-        self.auth_basic_username_input = self.query_one(
-            '#auth-basic-username', CustomInput
-        )
-        self.auth_basic_password_input = self.query_one(
-            '#auth-basic-password', PasswordInput
-        )
-        self.auth_bearer_token_input = self.query_one(
-            '#auth-bearer-token', PasswordInput
-        )
-        self.auth_api_key_key_input = self.query_one(
-            '#auth-api-key-key', CustomInput
-        )
-        self.auth_api_key_value_input = self.query_one(
-            '#auth-api-key-value', PasswordInput
-        )
-        self.auth_api_key_where_select = self.query_one(
-            '#auth-api-key-where', Select
-        )
-        self.auth_digest_username_input = self.query_one(
-            '#auth-digest-username', CustomInput
-        )
-        self.auth_digest_password_input = self.query_one(
-            '#auth-digest-password', PasswordInput
-        )
-        self.copy_auth_button = self.query_one('#copy-auth', Button)
-        self.paste_auth_button = self.query_one('#paste-auth', Button)
-
-        self.body_enabled_switch = self.query_one('#body-enabled', Switch)
-        self.body_mode_select = self.query_one('#body-mode', Select)
-        self.body_mode_switcher = self.query_one(
-            '#body-mode-switcher', ContentSwitcher
-        )
-        self.body_raw_editor = self.query_one('#body-raw', CustomTextArea)
-        self.body_raw_language_select = self.query_one(
-            '#body-raw-language', Select
-        )
-        self.body_file_path_chooser = self.query_one('#body-file', PathChooser)
-        self.body_form_urlencoded_fields = self.query_one(
-            '#body-form-urlencoded', DynamicFields
-        )
-        self.body_form_multipart_fields = self.query_one(
-            '#body-form-multipart', DynamicFields
+        # Headers tab
+        self.headers_dynamic_fields = DynamicFields(
+            fields=[TextDynamicField()]
         )
 
-        self.options_timeout_input = self.query_one(
-            '#options-timeout', CustomInput
-        )
-        self.options_follow_redirects_switch = self.query_one(
-            '#options-follow-redirects', Switch
-        )
-        self.options_verify_ssl_switch = self.query_one(
-            '#options-verify-ssl', Switch
-        )
-        self.options_attach_cookies_switch = self.query_one(
-            '#options-attach-cookies', Switch
+        headers_layout = QVBoxLayout(headers_tab)
+        headers_layout.addWidget(self.headers_dynamic_fields)
+
+        # Params tab
+        self.params_dynamic_fields = DynamicFields(fields=[TextDynamicField()])
+
+        params_layout = QVBoxLayout(params_tab)
+        params_layout.addWidget(self.params_dynamic_fields)
+
+        # Auth
+        self.auth_stack = QStackedWidget()
+
+        # Basic Auth
+        self.auth_basic_username_input = QLineEdit()
+        self.auth_basic_username_input.setPlaceholderText('Username')
+
+        self.auth_basic_password_input = PasswordInput()
+        self.auth_basic_password_input.setPlaceholderText('Password')
+
+        basic_widget = QWidget()
+        basic_layout = QVBoxLayout(basic_widget)
+
+        basic_first_row = QHBoxLayout()
+        basic_first_row.addWidget(self.auth_basic_username_input)
+        basic_first_row.addWidget(self.auth_basic_password_input)
+
+        basic_layout.addLayout(basic_first_row)
+        basic_layout.addStretch()
+
+        self.auth_stack.addWidget(basic_widget)
+
+        # Bearer Auth
+        self.auth_bearer_token_input = PasswordInput()
+        self.auth_bearer_token_input.setPlaceholderText('Token')
+
+        bearer_widget = QWidget()
+        bearer_layout = QVBoxLayout(bearer_widget)
+
+        bearer_first_row = QHBoxLayout()
+        bearer_first_row.addWidget(self.auth_bearer_token_input)
+
+        bearer_layout.addLayout(bearer_first_row)
+        bearer_layout.addStretch()
+
+        self.auth_stack.addWidget(bearer_widget)
+
+        # API Key Auth
+        self.auth_api_key_where_combobox = QComboBox()
+        self.auth_api_key_where_combobox.addItems(['header', 'param'])
+        self.auth_api_key_key_input = QLineEdit()
+        self.auth_api_key_key_input.setPlaceholderText('Key')
+        self.auth_api_key_value_input = QLineEdit()
+        self.auth_api_key_value_input.setPlaceholderText('Value')
+
+        api_key_widget = QWidget()
+        api_key_layout = QVBoxLayout(api_key_widget)
+
+        api_key_first_row = QHBoxLayout()
+        api_key_first_row.addWidget(self.auth_api_key_where_combobox)
+        api_key_first_row.addWidget(self.auth_api_key_key_input)
+        api_key_first_row.addWidget(self.auth_api_key_value_input)
+
+        api_key_layout.addLayout(api_key_first_row)
+        api_key_layout.addStretch()
+
+        self.auth_stack.addWidget(api_key_widget)
+
+        # Digest Auth
+        self.auth_digest_username_input = QLineEdit()
+        self.auth_digest_username_input.setPlaceholderText('Username')
+
+        self.auth_digest_password_input = PasswordInput()
+        self.auth_digest_password_input.setPlaceholderText('Password')
+
+        digest_widget = QWidget()
+        digest_layout = QVBoxLayout(digest_widget)
+
+        digest_first_row = QHBoxLayout()
+        digest_first_row.addWidget(self.auth_digest_username_input)
+        digest_first_row.addWidget(self.auth_digest_password_input)
+
+        digest_layout.addLayout(digest_first_row)
+        digest_layout.addStretch()
+
+        self.auth_stack.addWidget(digest_widget)
+
+        self.auth_enabled_checkbox = QCheckBox()
+        self.auth_enabled_checkbox.setStyleSheet("""
+        QCheckBox::indicator {
+            width: 20px;
+            height: 20px;
+        }
+        """)
+        self.auth_mode_combobox = QComboBox()
+        self.auth_mode_combobox.addItems([mode for mode in AuthMode])
+        self.auth_mode_combobox.currentIndexChanged.connect(
+            self.auth_stack.setCurrentIndex
         )
 
-    @property
-    def headers(self) -> list[dict[str, str | bool]]:
-        return [
+        first_row = QHBoxLayout()
+        first_row.addWidget(self.auth_enabled_checkbox)
+        first_row.addWidget(self.auth_mode_combobox, 1)
+
+        # Layout do tab de Auth
+        auth_layout = QVBoxLayout(auth_tab)
+        auth_layout.addLayout(first_row)
+        auth_layout.addWidget(self.auth_stack, 1)
+
+        # Body
+        self.body_enable_checkbox = QCheckBox()
+        self.body_enable_checkbox.setChecked(False)
+        self.body_enable_checkbox.setStyleSheet("""
+        QCheckBox::indicator {
+            width: 20px;
+            height: 20px;
+        }
+        """)
+
+        self.body_mode_combobox = QComboBox()
+        self.body_mode_combobox.addItems(
+            ['raw', 'file', 'form_urlencoded', 'form_multipart']
+        )
+
+        self.body_text_editor = Monaco()
+        self.body_text_editor.set_language('plaintext')
+        self.body_text_editor.set_theme('vs-dark')
+        self.body_text_editor.set_minimap_enabled(True)
+        self.body_text_editor._connector.send(
+            'update_editor_options',
             {
-                'enabled': header.enabled,
-                'key': header.key,
-                'value': header.value,
+                'tabSize': 2,
+                'insertSpaces': True,
+                'detectIndentation': False,
+            },
+        )
+
+        self.body_stack = QStackedWidget()
+
+        # Raw
+        raw_widget = QWidget()
+        raw_layout = QVBoxLayout(raw_widget)
+        raw_layout.addWidget(self.body_text_editor, 1)
+
+        self.body_raw_language_combobox = QComboBox()
+        self.body_raw_language_combobox.addItems(
+            [language for language in BodyRawLanguage]
+        )
+        self.body_raw_language_combobox.currentTextChanged.connect(
+            self._on_body_raw_language_changed
+        )
+
+        self.body_indent_size_combobox = QComboBox()
+        self.body_indent_size_combobox.addItems(['2', '4', '8'])
+        self.body_indent_size_combobox.currentTextChanged.connect(
+            self._on_indent_size_changed
+        )
+
+        raw_controls = QHBoxLayout()
+        raw_controls.addWidget(self.body_raw_language_combobox, 1)
+        raw_controls.addWidget(self.body_indent_size_combobox, 1)
+
+        raw_layout.addLayout(raw_controls)
+        self.body_stack.addWidget(raw_widget)
+
+        # File
+        self.file_input = QLineEdit()
+        self.file_input.setDisabled(True)
+        self.file_button = QPushButton('Browse')
+        file_row = QHBoxLayout()
+        file_row.addWidget(self.file_input)
+        file_row.addWidget(self.file_button)
+        file_widget = QWidget()
+        file_layout = QVBoxLayout(file_widget)
+        file_layout.addLayout(file_row)
+        file_layout.addStretch()
+        self.body_stack.addWidget(file_widget)
+
+        # Form urlencoded
+        self.urlencoded_dynamic_fields = DynamicFields(
+            fields=[TextDynamicField()]
+        )
+        urlencoded_widget = QWidget()
+        urlencoded_layout = QVBoxLayout(urlencoded_widget)
+        urlencoded_layout.addWidget(self.urlencoded_dynamic_fields)
+        urlencoded_layout.addStretch()
+        self.body_stack.addWidget(urlencoded_widget)
+
+        # Form multipart
+        self.multipart_dynamic_fields = DynamicFields(
+            fields=[TextOrFileDynamicField()]
+        )
+        multipart_widget = QWidget()
+        multipart_layout = QVBoxLayout(multipart_widget)
+        multipart_layout.addWidget(
+            self.multipart_dynamic_fields, 0, Qt.AlignTop
+        )
+        multipart_layout.addStretch()
+        self.body_stack.addWidget(multipart_widget)
+
+        # Conecta combobox ao stack
+        self.body_mode_combobox.currentIndexChanged.connect(
+            self.body_stack.setCurrentIndex
+        )
+
+        # Layout do body
+        body_first_line = QHBoxLayout()
+        body_first_line.addWidget(self.body_enable_checkbox)
+        body_first_line.addWidget(self.body_mode_combobox, 1)
+
+        body_layout = QVBoxLayout(body_tab)
+        body_layout.addLayout(body_first_line)
+        body_layout.addWidget(self.body_stack, 1)
+
+        # Options
+        self.options_timeout_label = QLabel()
+        self.options_timeout_label.setText('Timeout')
+        self.options_timeout_input = QLineEdit()
+        self.options_timeout_input.setPlaceholderText('5.5')
+        validator = QDoubleValidator(0.0, 100.0, 2)
+        validator.setLocale(QLocale.c())
+        self.options_timeout_input.setValidator(validator)
+
+        self.options_follow_redirects_checkbox = QCheckBox()
+        self.options_follow_redirects_checkbox.setStyleSheet("""
+QCheckBox::indicator {
+    width: 20px;
+    height: 20px;
+}
+""")
+        self.options_follow_redirects_label = QLabel()
+        self.options_follow_redirects_label.setText('Follow redirects')
+
+        self.options_verify_ssl_checkbox = QCheckBox()
+        self.options_verify_ssl_checkbox.setStyleSheet("""
+QCheckBox::indicator {
+    width: 20px;
+    height: 20px;
+}
+""")
+        self.options_verify_ssl_label = QLabel()
+        self.options_verify_ssl_label.setText('Verify SSL')
+
+        self.options_attach_cookies_checkbox = QCheckBox()
+        self.options_attach_cookies_checkbox.setStyleSheet("""
+QCheckBox::indicator {
+    width: 20px;
+    height: 20px;
+}
+""")
+        self.attach_cookies_label = QLabel()
+        self.attach_cookies_label.setText('Attach cookies (store and send)')
+
+        options_first_line = QHBoxLayout()
+        options_first_line.addWidget(self.options_timeout_label)
+        options_first_line.addWidget(self.options_timeout_input, 1)
+
+        options_second_line = QHBoxLayout()
+        options_second_line.addWidget(self.options_follow_redirects_checkbox)
+        options_second_line.addWidget(self.options_follow_redirects_label)
+        options_second_line.addStretch()
+
+        options_third_line = QHBoxLayout()
+        options_third_line.addWidget(self.options_verify_ssl_checkbox)
+        options_third_line.addWidget(self.options_verify_ssl_label)
+        options_third_line.addStretch()
+
+        options_fourth_line = QHBoxLayout()
+        options_fourth_line.addWidget(self.options_attach_cookies_checkbox)
+        options_fourth_line.addWidget(self.attach_cookies_label)
+        options_fourth_line.addStretch()
+
+        options_layout = QVBoxLayout(options_tab)
+        options_layout.addLayout(options_first_line)
+        options_layout.addLayout(options_second_line)
+        options_layout.addLayout(options_third_line)
+        options_layout.addLayout(options_fourth_line)
+        options_layout.addStretch()
+
+        # Register tabs
+        self.tabs.addTab(headers_tab, 'Headers')
+        self.tabs.addTab(params_tab, 'Params')
+        self.tabs.addTab(auth_tab, 'Auth')
+        self.tabs.addTab(body_tab, 'Body')
+        self.tabs.addTab(options_tab, 'Options')
+
+        # GroupBox
+        self.group_box = QGroupBox()
+        self.group_box.setTitle('Request')
+
+        group_layout = QVBoxLayout(self.group_box)
+        group_layout.addWidget(self.tabs)
+
+        # Main layout
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.group_box)
+
+        self.file_button.clicked.connect(self._on_browse_file)
+
+        self.headers_dynamic_fields.sig_edited.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.params_dynamic_fields.sig_edited.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.auth_basic_username_input.textChanged.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.auth_basic_password_input.sig_edited.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.auth_bearer_token_input.sig_edited.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.auth_api_key_where_combobox.currentTextChanged.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.auth_api_key_key_input.textEdited.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.auth_api_key_value_input.textEdited.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.auth_digest_username_input.textEdited.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.auth_digest_password_input.sig_edited.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.auth_enabled_checkbox.toggled.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.auth_mode_combobox.currentTextChanged.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.body_enable_checkbox.toggled.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.body_mode_combobox.currentTextChanged.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.body_text_editor.text_changed.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.body_raw_language_combobox.currentTextChanged.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.file_input.textChanged.connect(lambda: self.sig_edited.emit())
+        self.urlencoded_dynamic_fields.sig_edited.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.multipart_dynamic_fields.sig_edited.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.options_timeout_input.textChanged.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.options_follow_redirects_checkbox.toggled.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.options_verify_ssl_checkbox.toggled.connect(
+            lambda: self.sig_edited.emit()
+        )
+        self.options_attach_cookies_checkbox.toggled.connect(
+            lambda: self.sig_edited.emit()
+        )
+
+    def clear_data(self) -> None:
+        # Headers e Params
+        self.headers_dynamic_fields.clear_data()
+        self.params_dynamic_fields.clear_data()
+
+        # Auth
+        self.auth_enabled_checkbox.setChecked(False)
+        self.auth_mode_combobox.setCurrentText(AuthMode.BASIC)
+        self.auth_basic_username_input.setText('')
+        self.auth_basic_password_input.setText('')
+        self.auth_bearer_token_input.setText('')
+        self.auth_api_key_where_combobox.setCurrentText('header')
+        self.auth_api_key_key_input.setText('')
+        self.auth_api_key_value_input.setText('')
+        self.auth_digest_username_input.setText('')
+        self.auth_digest_password_input.setText('')
+
+        # Body
+        self.body_enable_checkbox.setChecked(False)
+        self.body_mode_combobox.setCurrentText(BodyMode.RAW)
+        self.body_text_editor.set_text('')
+        self.body_raw_language_combobox.setCurrentText(BodyRawLanguage.PLAIN)
+        self.body_indent_size_combobox.setCurrentText('2')
+        self.file_input.clear()
+        self.urlencoded_dynamic_fields.clear_data()
+        self.multipart_dynamic_fields.clear_data()
+
+        # Options
+        self.options_timeout_input.clear()
+        self.options_follow_redirects_checkbox.setChecked(False)
+        self.options_verify_ssl_checkbox.setChecked(False)
+        self.options_attach_cookies_checkbox.setChecked(False)
+
+    def get_data(self) -> dict:
+        auth_enabled = self.auth_enabled_checkbox.isChecked()
+        auth_mode = self.auth_mode_combobox.currentText()
+        auth = None
+        if auth_mode == AuthMode.BASIC:
+            auth = {
+                'username': self.auth_basic_username_input.text(),
+                'password': self.auth_basic_password_input.text(),
             }
-            for header in self.header_fields.fields
-            if header.is_filled or header.enabled
-        ]
-
-    @headers.setter
-    def headers(self, headers: list[dict[str, str | bool]]) -> None:
-        for field in self.header_fields.fields:
-            self.header_fields.remove_field(field=field)
-
-        for header in headers:
-            self.run_worker(
-                self.header_fields.add_field(
-                    field=TextDynamicField(
-                        enabled=header['enabled'],
-                        key=header['key'],
-                        value=header['value'],
-                    ),
-                    before_last=True,
-                )
-            )
-
-    @property
-    def params(self) -> list[dict[str, str | bool]]:
-        return [
-            {
-                'enabled': param.enabled,
-                'key': param.key,
-                'value': param.value,
+        elif auth_mode == AuthMode.BEARER:
+            auth = {'token': self.auth_bearer_token_input.text()}
+        elif auth_mode == AuthMode.API_KEY:
+            auth = {
+                'where': self.auth_api_key_where_combobox.currentText(),
+                'key': self.auth_api_key_key_input.text(),
+                'value': self.auth_api_key_value_input.text(),
             }
-            for param in self.param_fields.fields
-            if param.is_filled or param.enabled
-        ]
-
-    @params.setter
-    def params(self, params: list[dict[str, str | bool]]) -> None:
-        for field in self.param_fields.fields:
-            self.param_fields.remove_field(field=field)
-
-        for param in params:
-            self.run_worker(
-                self.param_fields.add_field(
-                    field=TextDynamicField(
-                        enabled=param['enabled'],
-                        key=param['key'],
-                        value=param['value'],
-                    ),
-                    before_last=True,
-                )
-            )
-
-    @property
-    def auth_enabled(self) -> bool:
-        return self.auth_enabled_switch.value
-
-    @auth_enabled.setter
-    def auth_enabled(self, value: bool) -> None:
-        self.auth_enabled_switch.value = value
-
-    @property
-    def auth_mode(self) -> AuthMode:
-        return self.auth_mode_select.value
-
-    @auth_mode.setter
-    def auth_mode(self, value: AuthMode) -> None:
-        self.auth_mode_select.value = value
-
-    @property
-    def auth_basic_username(self) -> str:
-        return self.auth_basic_username_input.value
-
-    @auth_basic_username.setter
-    def auth_basic_username(self, value: str) -> None:
-        self.auth_basic_username_input.value = value
-
-    @property
-    def auth_basic_password(self) -> str:
-        return self.auth_basic_password_input.value
-
-    @auth_basic_password.setter
-    def auth_basic_password(self, value: str) -> None:
-        self.auth_basic_password_input.value = value
-
-    @property
-    def auth_bearer_token(self) -> str:
-        return self.auth_bearer_token_input.value
-
-    @auth_bearer_token.setter
-    def auth_bearer_token(self, value: str) -> None:
-        self.auth_bearer_token_input.value = value
-
-    @property
-    def auth_api_key_key(self) -> str:
-        return self.auth_api_key_key_input.value
-
-    @auth_api_key_key.setter
-    def auth_api_key_key(self, value: str) -> None:
-        self.auth_api_key_key_input.value = value
-
-    @property
-    def auth_api_key_value(self) -> str:
-        return self.auth_api_key_value_input.value
-
-    @auth_api_key_value.setter
-    def auth_api_key_value(self, value: str) -> None:
-        self.auth_api_key_value_input.value = value
-
-    @property
-    def auth_api_key_where(self) -> str:
-        return self.auth_api_key_where_select.value
-
-    @auth_api_key_where.setter
-    def auth_api_key_where(self, value: str) -> None:
-        self.auth_api_key_where_select.value = value
-
-    @property
-    def auth_digest_username(self) -> str:
-        return self.auth_digest_username_input.value
-
-    @auth_digest_username.setter
-    def auth_digest_username(self, value: str) -> None:
-        self.auth_digest_username_input.value = value
-
-    @property
-    def auth_digest_password(self) -> str:
-        return self.auth_digest_password_input.value
-
-    @auth_digest_password.setter
-    def auth_digest_password(self, value: str) -> None:
-        self.auth_digest_password_input.value = value
-
-    @property
-    def body_enabled(self) -> bool:
-        return self.body_enabled_switch.value
-
-    @body_enabled.setter
-    def body_enabled(self, value: bool) -> None:
-        self.body_enabled_switch.value = value
-
-    @property
-    def body_mode(self) -> BodyMode:
-        return self.body_mode_select.value
-
-    @body_mode.setter
-    def body_mode(self, value: BodyMode) -> None:
-        self.body_mode_select.value = value
-
-    @property
-    def body_raw_language(self) -> BodyRawLanguage:
-        return self.body_raw_language_select.value
-
-    @body_raw_language.setter
-    def body_raw_language(self, value: BodyRawLanguage) -> None:
-        self.body_raw_language_select.value = value
-
-    @property
-    def body_raw(self) -> str:
-        return self.body_raw_editor.text
-
-    @body_raw.setter
-    def body_raw(self, value: str) -> None:
-        self.body_raw_editor.text = value
-
-    @property
-    def body_file(self) -> Path | None:
-        return self.body_file_path_chooser.path
-
-    @body_file.setter
-    def body_file(self, value: Path | None) -> None:
-        self.body_file_path_chooser.path = value
-
-    @property
-    def body_form_urlencoded(self) -> list[dict[str, str | bool]]:
-        return [
-            {
-                'enabled': field.enabled,
-                'key': field.key,
-                'value': field.value,
+        elif auth_mode == AuthMode.DIGEST:
+            auth = {
+                'username': self.auth_digest_username_input.text(),
+                'password': self.auth_digest_password_input.text(),
             }
-            for field in self.body_form_urlencoded_fields.fields
-            if field.is_filled or field.enabled
-        ]
 
-    @body_form_urlencoded.setter
-    def body_form_urlencoded(
-        self, values: list[dict[str, str | bool]]
-    ) -> None:
-        for field in self.body_form_urlencoded_fields.fields:
-            self.body_form_urlencoded_fields.remove_field(field=field)
-
-        for value in values:
-            self.run_worker(
-                self.body_form_urlencoded_fields.add_field(
-                    field=TextDynamicField(
-                        enabled=value['enabled'],
-                        key=value['key'],
-                        value=value['value'],
-                    ),
-                    before_last=True,
-                )
-            )
-
-    @property
-    def body_form_multipart(self) -> list[dict[str, str | bool, Path | None]]:
-        return [
-            {
-                'enabled': field.enabled,
-                'key': field.key,
-                'value': field.value,
-                'value_kind': field.value_kind,
+        body_enabled = self.body_enable_checkbox.isChecked()
+        body_mode = self.body_mode_combobox.currentText()
+        body = None
+        if body_mode == BodyMode.RAW:
+            body = {
+                'language': self.body_raw_language_combobox.currentText(),
+                'value': self.body_text_editor.get_text(),
             }
-            for field in self.body_form_multipart_fields.fields
-            if field.is_filled or field.enabled
-        ]
+        elif body_mode == BodyMode.FILE:
+            body = {
+                'file': (
+                    Path(self.file_input.text())
+                    if self.file_input.text()
+                    else None
+                ),
+            }
+        elif body_mode == BodyMode.FORM_URLENCODED:
+            body = {
+                'fields': [
+                    field.get_data()
+                    for field in self.urlencoded_dynamic_fields.fields
+                ],
+            }
+        elif body_mode == BodyMode.FORM_MULTIPART:
+            body = {
+                'fields': [
+                    field.get_data()
+                    for field in self.multipart_dynamic_fields.fields
+                ],
+            }
 
-    @body_form_multipart.setter
-    def body_form_multipart(
-        self, values: list[dict[str, str | bool, Path | None]]
-    ) -> None:
-        for field in self.body_form_multipart_fields.fields:
-            self.body_form_multipart_fields.remove_field(field=field)
-
-        for value in values:
-            self.run_worker(
-                self.body_form_multipart_fields.add_field(
-                    TextOrFileDynamicField(
-                        enabled=value['enabled'],
-                        key=value['key'],
-                        value=value['value'],
-                        value_kind=value['value_kind'],
-                    ),
-                    before_last=True,
-                )
-            )
-
-    @property
-    def option_timeout(self) -> float | None:
-        try:
-            return float(self.options_timeout_input.value)
-        except ValueError:
-            return None
-
-    @option_timeout.setter
-    def option_timeout(self, value: float | None) -> None:
-        self.options_timeout_input.value = '' if value is None else str(value)
-
-    @property
-    def option_follow_redirects(self) -> bool:
-        return self.options_follow_redirects_switch.value
-
-    @option_follow_redirects.setter
-    def option_follow_redirects(self, value: bool) -> None:
-        self.options_follow_redirects_switch.value = value
-
-    @property
-    def option_verify_ssl(self) -> bool:
-        return self.options_verify_ssl_switch.value
-
-    @option_verify_ssl.setter
-    def option_verify_ssl(self, value: bool) -> None:
-        self.options_verify_ssl_switch.value = value
-
-    @property
-    def option_attach_cookies(self) -> bool:
-        return self.options_attach_cookies_switch.value
-
-    @option_attach_cookies.setter
-    def option_attach_cookies(self, value: bool) -> None:
-        self.options_attach_cookies_switch.value = value
-
-    def clear(self) -> None:
-        self.headers = []
-        self.params = []
-
-        self.auth_enabled = False
-        self.auth_mode = AuthMode.BASIC
-        self.auth_basic_username = ''
-        self.auth_basic_password = ''
-        self.auth_bearer_token = ''
-        self.auth_api_key_key = ''
-        self.auth_api_key_value = ''
-        self.auth_api_key_where = 'header'
-        self.auth_digest_username = ''
-        self.auth_digest_password = ''
-
-        self.body_enabled = False
-        self.body_mode = BodyMode.RAW
-        self.body_raw_language = BodyRawLanguage.PLAIN
-        self.body_raw = ''
-        self.body_file = None
-        self.body_form_urlencoded = []
-        self.body_form_multipart = []
-
-        self.option_timeout = None
-        self.option_follow_redirects = False
-        self.option_verify_ssl = False
-
-    @on(Select.Changed, '#auth-mode')
-    def _on_change_auth_mode(self, message: Select.Changed) -> None:
-        if message.value == 'basic':
-            self.auth_mode_switcher.current = 'auth-basic'
-        elif message.value == 'bearer':
-            self.auth_mode_switcher.current = 'auth-bearer'
-        elif message.value == 'api_key':
-            self.auth_mode_switcher.current = 'auth-api-key'
-        elif message.value == 'digest':
-            self.auth_mode_switcher.current = 'auth-digest'
-
-    @on(Select.Changed, '#body-mode')
-    def _on_change_body_mode(self, message: Select.Changed) -> None:
-        if message.value == BodyMode.FILE:
-            self.body_mode_switcher.current = 'body-mode-file'
-        elif message.value == BodyMode.RAW:
-            self.body_mode_switcher.current = 'body-mode-raw'
-        elif message.value == BodyMode.FORM_URLENCODED:
-            self.body_mode_switcher.current = 'body-mode-form-urlencoded'
-        elif message.value == BodyMode.FORM_MULTIPART:
-            self.body_mode_switcher.current = 'body-mode-form-multipart'
-
-    @on(Select.Changed, '#body-raw-language')
-    def _on_change_body_raw_language(self, message: Select.Changed) -> None:
-        self.body_raw_editor.language = message.value
-
-    @on(Button.Pressed, '#copy-auth')
-    def _on_copy_auth(self, message: Button.Pressed) -> None:
-        self._auth_clipboard = {
-            'enabled': self.auth_enabled,
-            'mode': self.auth_mode,
-            'basic_username': self.auth_basic_username,
-            'basic_password': self.auth_basic_password,
-            'bearer_token': self.auth_bearer_token,
-            'api_key_where': self.auth_api_key_where,
-            'api_key_key': self.auth_api_key_key,
-            'api_key_value': self.auth_api_key_value,
-            'digest_username': self.auth_digest_username,
-            'digest_password': self.auth_digest_password,
+        return {
+            'headers': [
+                field.get_data()
+                for field in self.headers_dynamic_fields.fields
+                if field.is_filled
+            ],
+            'params': [
+                field.get_data()
+                for field in self.params_dynamic_fields.fields
+                if field.is_filled
+            ],
+            'auth_enabled': auth_enabled,
+            'auth_mode': auth_mode,
+            'auth': auth,
+            'body_enabled': body_enabled,
+            'body_mode': body_mode,
+            'body': body,
+            'options': {
+                'timeout': float(self.options_timeout_input.text() or 0),
+                'follow_redirects': self.options_follow_redirects_checkbox.isChecked(),
+                'verify_ssl': self.options_verify_ssl_checkbox.isChecked(),
+                'attach_cookies': self.options_attach_cookies_checkbox.isChecked(),
+            },
         }
 
-        self.app.notify('Auth copied')
+    def set_data(self, data: dict) -> None:
+        for field in data.get('headers', []):
+            self.headers_dynamic_fields.add_field(
+                TextDynamicField(
+                    enabled=field['enabled'],
+                    key=field['key'],
+                    value=field['value'],
+                )
+            )
 
-    @on(Button.Pressed, '#paste-auth')
-    def _on_paste_auth(self, message: Button.Pressed) -> None:
-        if not self._auth_clipboard:
-            self.app.notify('Nothing copied', severity='error')
+        for field in data.get('params', []):
+            self.params_dynamic_fields.add_field(
+                TextDynamicField(
+                    enabled=field['enabled'],
+                    key=field['key'],
+                    value=field['value'],
+                )
+            )
+
+        self.auth_enabled_checkbox.setChecked(data['auth_enabled'])
+        self.auth_mode_combobox.setCurrentText(data['auth_mode'])
+        if data['auth_mode'] == AuthMode.BASIC:
+            self.auth_basic_username_input.setText(data['auth']['username'])
+            self.auth_basic_password_input.setText(data['auth']['password'])
+        elif data['auth_mode'] == AuthMode.BEARER:
+            self.auth_bearer_token_input.setText(data['auth']['token'])
+        elif data['auth_mode'] == AuthMode.API_KEY:
+            self.auth_api_key_where_combobox.setCurrentText(
+                data['auth']['where']
+            )
+            self.auth_api_key_key_input.setText(data['auth']['key'])
+            self.auth_api_key_value_input.setText(data['auth']['value'])
+        elif data['auth_mode'] == AuthMode.DIGEST:
+            self.auth_digest_username_input.setText(data['auth']['username'])
+            self.auth_digestpassword_input.setText(data['auth']['password'])
+
+        self.body_enable_checkbox.setChecked(data['body_enabled'])
+        self.body_mode_combobox.setCurrentText(data['body_mode'])
+        if data['body_mode'] == BodyMode.RAW:
+            self.body_raw_language_combobox.setCurrentText(
+                data['body']['language']
+            )
+            self.body_text_editor.set_text(data['body']['value'])
+        elif data['body_mode'] == BodyMode.FILE:
+            self.file_input.setText(str(data['body']['file']))
+        elif data['body_mode'] == BodyMode.FORM_URLENCODED:
+            for field in data['body']['fields']:
+                self.urlencoded_dynamic_fields.add_field(
+                    TextDynamicField(
+                        enabled=field['enabled'],
+                        key=field['key'],
+                        value=field['value'],
+                    )
+                )
+        elif data['body_mode'] == BodyMode.FORM_MULTIPART:
+            for field in data['body']['fields']:
+                self.multipart_dynamic_fields.add_field(
+                    TextOrFileDynamicField(
+                        value_kind=field['value_kind'],
+                        enabled=field['enabled'],
+                        key=field['key'],
+                        value=str(field['value']) if field['value'] else '',
+                    )
+                )
+
+        self.options_timeout_input.setText(str(data['options']['timeout']))
+        self.options_follow_redirects_checkbox.setChecked(
+            data['options']['follow_redirects']
+        )
+        self.options_verify_ssl_checkbox.setChecked(
+            data['options']['verify_ssl']
+        )
+        self.options_attach_cookies_checkbox.setChecked(
+            data['options']['attach_cookies']
+        )
+
+    def _on_body_raw_language_changed(self, text_type: str) -> None:
+        self.body_text_editor.set_language(language=text_type)
+
+    def _on_indent_size_changed(self, indent_size: str) -> None:
+        self.body_text_editor._connector.send(
+            'update_editor_options',
+            {
+                'tabSize': int(indent_size),
+                'insertSpaces': True,
+                'detectIndentation': False,
+            },
+        )
+
+    def _on_browse_file(self) -> None:
+        filename, _ = QFileDialog.getOpenFileName(self, 'Select file')
+
+        if not filename:
             return
 
-        self.auth_enabled_switch.value = self._auth_clipboard['enabled']
-        self.auth_mode_select.value = self._auth_clipboard['mode']
-
-        if self._auth_clipboard['mode'] == AuthMode.BASIC:
-            self.auth_basic_username = self._auth_clipboard['basic_username']
-            self.auth_basic_password = self._auth_clipboard['basic_password']
-        elif self._auth_clipboard['mode'] == AuthMode.BEARER:
-            self.auth_bearer_token = self._auth_clipboard['bearer_token']
-        elif self._auth_clipboard['mode'] == AuthMode.API_KEY:
-            self.auth_api_key_where = self._auth_clipboard['api_key_where']
-            self.auth_api_key_key = self._auth_clipboard['api_key_key']
-            self.auth_api_key_value = self._auth_clipboard['api_key_value']
-        elif self._auth_clipboard['mode'] == AuthMode.DIGEST:
-            self.auth_digest_username = self._auth_clipboard['digest_username']
-            self.auth_digest_password = self._auth_clipboard['digest_password']
-
-        self.app.notify('Auth pasted')
+        self.file_input.setText(filename)
