@@ -381,6 +381,7 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(export_button)
         self.addToolBar(toolbar)
 
+        # TODO: USar toolbar tmbm mas na esquerda
         self.sidebar = QTreeWidget()
         self.sidebar.setHeaderHidden(True)
         self.sidebar.setIconSize(QSize(32, 32))
