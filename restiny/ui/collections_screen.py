@@ -822,6 +822,7 @@ class CollectionsScreen(QWidget):
         mimetype = content_type.split(';', 1)[0].strip().lower()
 
         response_data = {
+            'request_url': self.url_area.get_data()['url'],
             'status': HTTPStatus(response.status_code),
             'content_size': response.num_bytes_downloaded,
             'elapsed_time': round(response.elapsed.total_seconds(), 2),
