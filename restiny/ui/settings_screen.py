@@ -17,9 +17,8 @@ from restiny.widgets.color_picker import ColorPicker
 
 
 class SettingsScreen(QWidget):
-    def __init__(self, app, settings_repo: SettingsSQLRepo) -> None:
+    def __init__(self, settings_repo: SettingsSQLRepo) -> None:
         super().__init__()
-        self.app = app
         self.settings_repo = settings_repo
 
         self.theme_label = QLabel('Theme')

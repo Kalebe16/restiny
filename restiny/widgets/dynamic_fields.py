@@ -293,7 +293,6 @@ class DynamicFields(QWidget):
 
         for field in fields:
             self.add_field(field)
-            field.sig_edited.connect(self.sig_edited)
 
         if not self.fields or self.fields[-1].is_filled:
             self.add_field(field_type())
@@ -315,6 +314,7 @@ class DynamicFields(QWidget):
             lambda: field.enable_checkbox.setChecked(True)
         )
         field.sig_remove_requested.connect(lambda: self.remove_field(field))
+        field.sig_edited.connect(lambda: self.sig_edited.emit())
         if self.fields and self.fields[-1].is_empty:
             self.layout.insertWidget(self.layout.count() - 1, field)
         else:
@@ -324,7 +324,9 @@ class DynamicFields(QWidget):
     def ensure_empty_field(self) -> None:
         field_type = type(self.fields[0])
         if all(field.is_filled for field in self.fields):
-            self.add_field(field_type())
+            field = field_type()
+            field.sig_edited.connect(lambda: self.sig_edited.emit())
+            self.add_field(field)
 
     def remove_field(
         self,
@@ -368,7 +370,7 @@ class DynamicFields(QWidget):
 
         self.layout.removeWidget(field)
         field.deleteLater()
-        lambda: self.sig_edited.emit()()
+        self.sig_edited.emit()
 
     def clear_data(self):
         for field in self.fields:

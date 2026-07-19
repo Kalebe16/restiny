@@ -4,7 +4,7 @@ import subprocess
 import sys
 
 import qasync
-from PySide6.QtWidgets import QApplication, QComboBox, QListView
+from PySide6.QtWidgets import QApplication
 
 from restiny.data.db import DBManager
 from restiny.data.repos import (
@@ -15,6 +15,7 @@ from restiny.data.repos import (
 )
 from restiny.themes import dark, light
 from restiny.ui.app import MainWindow
+from restiny.utils import fix_pyside_stylesheet
 
 
 def get_real_python():
@@ -68,7 +69,6 @@ def main() -> None:
         light(accent_color=settings.accent_color)
 
     window = MainWindow(
-        app=app,
         db_manager=db_manager,
         folders_repo=FoldersSQLRepo(db_manager=db_manager),
         requests_repo=RequestsSQLRepo(db_manager=db_manager),
@@ -77,10 +77,7 @@ def main() -> None:
     )
     window.show()
 
-    # Fix combobox
-    for combo in window.findChildren(QComboBox):
-        view = QListView(combo)
-        combo.setView(view)
+    fix_pyside_stylesheet(window=window, accent_color=settings.accent_color)
 
     with loop:
         loop.run_forever()

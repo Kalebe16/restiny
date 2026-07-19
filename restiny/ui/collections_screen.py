@@ -28,6 +28,7 @@ from restiny.data.repos import (
     EnvironmentsSQLRepo,
     FoldersSQLRepo,
     RequestsSQLRepo,
+    SettingsSQLRepo,
 )
 from restiny.entities import Folder, Request
 from restiny.enums import (
@@ -41,6 +42,7 @@ from restiny.ui.request_area import RequestArea
 from restiny.ui.response_area import ResponseArea
 from restiny.ui.top_bar_area import TopBarArea
 from restiny.ui.url_area import URLArea
+from restiny.utils import fix_pyside_stylesheet
 from restiny.widgets.collections_tree import CollectionsTree
 
 
@@ -72,12 +74,14 @@ class CollectionsScreen(QWidget):
         folders_repo: FoldersSQLRepo,
         requests_repo: RequestsSQLRepo,
         environments_repo: EnvironmentsSQLRepo,
+        settings_repo: SettingsSQLRepo,
     ):
         super().__init__()
         self.main_window = main_window
         self.folders_repo = folders_repo
         self.requests_repo = requests_repo
         self.environments_repo = environments_repo
+        self.settings_repo = settings_repo
         self._active_request_task: asyncio.Task | None = None
         self._collections_tree_showing = True
         self._cookies: httpx.Cookies = httpx.Cookies()
@@ -158,6 +162,12 @@ class CollectionsScreen(QWidget):
         layout.addWidget(self.collections_tree, 1)
         layout.addLayout(main_content, 8)
 
+        self.request_area.sig_edited.connect(
+            lambda: fix_pyside_stylesheet(
+                window=self.main_window,
+                accent_color=self.settings_repo.get().data.accent_color,
+            )
+        )
         self.request_area.sig_edited.connect(self._on_request_edited)
         self.url_area.sig_edited.connect(self._on_request_edited)
         self.url_area.sig_send_requested.connect(

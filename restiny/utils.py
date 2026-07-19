@@ -2,6 +2,27 @@ import shlex
 from pathlib import Path
 
 import httpx
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QListView,
+    QMainWindow,
+    QPushButton,
+)
+
+
+def fix_pyside_stylesheet(window: QMainWindow, accent_color: str) -> None:
+    for combo in window.findChildren(QComboBox):
+        view = QListView(combo)
+        combo.setView(view)
+    for button in window.findChildren(QPushButton):
+        button.setStyleSheet(
+            f'QPushButton:focus {{ border: 2px solid {accent_color} }}'
+        )
+    for checkbox in window.findChildren(QCheckBox):
+        checkbox.setStyleSheet(
+            f'QCheckBox:focus {{ border-bottom: 2px solid {accent_color} }}'
+        )
 
 
 def build_curl_cmd(

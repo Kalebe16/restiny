@@ -303,7 +303,6 @@ class ExportedCollectionFileV1(BaseModel):
 class MainWindow(QMainWindow):
     def __init__(
         self,
-        app,
         db_manager: DBManager,
         folders_repo: FoldersSQLRepo,
         requests_repo: RequestsSQLRepo,
@@ -311,7 +310,6 @@ class MainWindow(QMainWindow):
         settings_repo: SettingsSQLRepo,
     ) -> None:
         super().__init__()
-        self.app = app
         self.db_manager = db_manager
         self.folders_repo = folders_repo
         self.requests_repo = requests_repo
@@ -402,13 +400,14 @@ class MainWindow(QMainWindow):
             folders_repo=self.folders_repo,
             requests_repo=self.requests_repo,
             environments_repo=self.environments_repo,
+            settings_repo=self.settings_repo,
         )
         self.environments_screen = EnvironmentScreen(
-            environments_repo=self.environments_repo
+            main_window=self,
+            environments_repo=self.environments_repo,
+            settings_repo=self.settings_repo,
         )
-        self.settings_screen = SettingsScreen(
-            app=self.app, settings_repo=self.settings_repo
-        )
+        self.settings_screen = SettingsScreen(settings_repo=self.settings_repo)
 
         self.stack = QStackedWidget()
         self.stack.addWidget(self.collections_screen)
@@ -421,13 +420,13 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.stack, 12)
         self.setCentralWidget(container)
 
-        self.environments_screen.sig_environment_added.connect(
+        self.environments_screen.sig_added.connect(
             self.collections_screen.top_bar_area._populate_environments
         )
-        self.environments_screen.sig_environment_removed.connect(
+        self.environments_screen.sig_removed.connect(
             self.collections_screen.top_bar_area._populate_environments
         )
-        self.environments_screen.sig_environment_saved.connect(
+        self.environments_screen.sig_saved.connect(
             self.collections_screen.top_bar_area._populate_environments
         )
         QTimer.singleShot(3000, self._check_new_release)
