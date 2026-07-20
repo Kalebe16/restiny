@@ -21,13 +21,13 @@ CREATE TABLE IF NOT EXISTS requests (
   name TEXT NOT NULL,
 
   method TEXT NOT NULL,
-  url TEXT NULL,
+  url TEXT NOT NULL,
   headers JSON NOT NULL DEFAULT '[]',
   params JSON NOT NULL DEFAULT '[]',
 
   body_enabled BOOLEAN NOT NULL,
   body_mode TEXT NOT NULL,
-  body JSON NULL,
+  body JSON NOT NULL,
 
   auth_enabled BOOLEAN NOT NULL,
   auth_mode TEXT NOT NULL,

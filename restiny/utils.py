@@ -21,7 +21,10 @@ def fix_pyside_stylesheet(window: QMainWindow, accent_color: str) -> None:
         )
     for checkbox in window.findChildren(QCheckBox):
         checkbox.setStyleSheet(
-            f'QCheckBox:focus {{ border-bottom: 2px solid {accent_color} }}'
+            f"""\
+            QCheckBox:focus {{ border-bottom: 2px solid {accent_color} }}\
+            QCheckBox::indicator {{ width: 24px; height: 24px; }}
+            """
         )
 
 

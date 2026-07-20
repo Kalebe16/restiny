@@ -1,4 +1,4 @@
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QSignalBlocker, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -74,8 +74,9 @@ class URLArea(QWidget):
         self._request_pending = value
 
     def clear_data(self) -> None:
-        self.method_combo_box.setCurrentText(HTTPMethod.GET)
-        self.url_input.clear()
+        with QSignalBlocker(self):
+            self.method_combo_box.setCurrentText(HTTPMethod.GET)
+            self.url_input.clear()
 
     def get_data(self) -> dict:
         return dict(
@@ -84,8 +85,9 @@ class URLArea(QWidget):
         )
 
     def set_data(self, data: dict) -> None:
-        self.method_combo_box.setCurrentText(data['method'])
-        self.url_input.setText(data['url'])
+        with QSignalBlocker(self):
+            self.method_combo_box.setCurrentText(data['method'])
+            self.url_input.setText(data['url'])
 
     def _on_send(self) -> None:
         if self.request_pending:

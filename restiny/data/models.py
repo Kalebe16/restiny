@@ -17,7 +17,12 @@ class SQLFolder(SQLModelBase):
     parent_id: Mapped[int | None] = mapped_column(
         ForeignKey('folders.id'), nullable=True
     )
-
+    headers: Mapped[str] = mapped_column(nullable=False, default='[]')
+    auth_mode: Mapped[str] = mapped_column(nullable=False, default='basic')
+    auth: Mapped[str] = mapped_column(
+        nullable=False, default='{{"username":"","password":""}}'
+    )
+    documentation: Mapped[str] = mapped_column(nullable=False, default='')
     created_at: Mapped[datetime] = mapped_column(
         DateTime(),
         default=func.current_timestamp(),
@@ -42,23 +47,33 @@ class SQLRequest(SQLModelBase):
     )
     name: Mapped[str] = mapped_column(nullable=False)
 
-    method: Mapped[str] = mapped_column(nullable=False)
-    url: Mapped[str | None] = mapped_column(nullable=True)
-    headers: Mapped[str | None] = mapped_column(nullable=True)
-    params: Mapped[str | None] = mapped_column(nullable=True)
+    method: Mapped[str] = mapped_column(nullable=False, default='GET')
+    url: Mapped[str] = mapped_column(nullable=False, default='')
+    headers: Mapped[str] = mapped_column(nullable=False, default='[]')
+    params: Mapped[str] = mapped_column(nullable=False, default='[]')
 
-    body_enabled: Mapped[bool] = mapped_column(nullable=False)
-    body_mode: Mapped[str] = mapped_column(nullable=False)
-    body: Mapped[str | None] = mapped_column(nullable=True)
+    body_enabled: Mapped[bool] = mapped_column(nullable=False, default=False)
+    body_mode: Mapped[str] = mapped_column(nullable=False, default='raw')
+    body: Mapped[str] = mapped_column(
+        nullable=False, default='{{"language":"plaintext","value":""}}'
+    )
 
-    auth_enabled: Mapped[bool] = mapped_column(nullable=False)
-    auth_mode: Mapped[str] = mapped_column(nullable=False)
+    auth_enabled: Mapped[bool] = mapped_column(nullable=False, default=False)
+    auth_mode: Mapped[str] = mapped_column(nullable=False, default='inherited')
     auth: Mapped[str | None] = mapped_column(nullable=True)
 
-    option_timeout: Mapped[float | None] = mapped_column(nullable=True)
-    option_follow_redirects: Mapped[bool] = mapped_column(nullable=False)
-    option_verify_ssl: Mapped[bool] = mapped_column(nullable=False)
-    option_attach_cookies: Mapped[bool] = mapped_column(nullable=False)
+    option_timeout: Mapped[float | None] = mapped_column(
+        nullable=True, default=5.5
+    )
+    option_follow_redirects: Mapped[bool] = mapped_column(
+        nullable=False, default=True
+    )
+    option_verify_ssl: Mapped[bool] = mapped_column(
+        nullable=False, default=True
+    )
+    option_attach_cookies: Mapped[bool] = mapped_column(
+        nullable=False, default=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(),

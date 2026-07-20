@@ -21,7 +21,10 @@ dependencies = [
     "qtmonaco>=0.10, <0.11",
     "qasync>=0.28, <0.29",
     "PySide6>=6.11, <6.12",
-    "pyqtdarktheme-fork>=2.3, <2.4"
+    "pyqtdarktheme-fork>=2.3, <2.4",
+    "markdown>=3.10, <3.11",
+    "pymdown-extensions>=11.0, <12.0",
+    "pygments>=2.20, <2.21"
 ]
 keywords = [
     "restiny",

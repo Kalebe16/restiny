@@ -25,6 +25,32 @@ from restiny.enums import (
 from restiny.utils import build_curl_cmd
 
 
+class Header(BaseModel):
+    enabled: bool
+    key: str
+    value: str
+
+
+class BasicAuth(BaseModel):
+    username: str
+    password: str
+
+
+class BearerAuth(BaseModel):
+    token: str
+
+
+class ApiKeyAuth(BaseModel):
+    key: str
+    value: str
+    where: Literal['header', 'param']
+
+
+class DigestAuth(BaseModel):
+    username: str
+    password: str
+
+
 class Folder(BaseModel):
     id: int | None = None
     uuid: UUID = _Field(default_factory=uuid4)
@@ -32,73 +58,83 @@ class Folder(BaseModel):
     name: str
     parent_id: int | None = None
 
+    headers: list[Header] = _Field(default_factory=list)
+
+    auth_mode: AuthMode = AuthMode.BASIC
+    auth: BasicAuth | BearerAuth | ApiKeyAuth | DigestAuth = BasicAuth(
+        username='', password=''
+    )
+
+    documentation: str = ''
+
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
+    def gen_hash(self) -> None:
+        return hashlib.sha256(
+            json.dumps(
+                self.model_dump(
+                    exclude=[
+                        'id',
+                        'uuid',
+                        'parent_id',
+                        'created_at',
+                        'updated_at',
+                    ]
+                ),
+                sort_keys=True,
+                default=str,
+            ).encode('utf-8')
+        ).hexdigest()
+
+
+class Param(BaseModel):
+    enabled: bool
+    key: str
+    value: str
+
+
+class RawBody(BaseModel):
+    language: BodyRawLanguage
+    value: str
+
+
+class FileBody(BaseModel):
+    file: Path | None
+
+
+class UrlEncodedFormBody(BaseModel):
+    class Field(BaseModel):
+        enabled: bool
+        key: str
+        value: str
+
+    fields: list[Field]
+
+
+class MultipartFormBody(BaseModel):
+    class Field(BaseModel):
+        value_kind: Literal['text', 'file']
+        enabled: bool
+        key: str
+        value: str | Path | None
+
+        @field_validator('value', mode='before')
+        @classmethod
+        def validate_value(cls, value: Any, info: ValidationInfo):
+            if value is None:
+                return None
+
+            kind = info.data.get('value_kind')
+            if kind == 'file':
+                return Path(value)
+            elif kind == 'text':
+                return str(value)
+
+    fields: list[Field]
+
 
 class Request(BaseModel):
-    class Header(BaseModel):
-        enabled: bool
-        key: str
-        value: str
-
-    class Param(BaseModel):
-        enabled: bool
-        key: str
-        value: str
-
-    class RawBody(BaseModel):
-        language: BodyRawLanguage
-        value: str
-
-    class FileBody(BaseModel):
-        file: Path | None
-
-    class UrlEncodedFormBody(BaseModel):
-        class Field(BaseModel):
-            enabled: bool
-            key: str
-            value: str
-
-        fields: list[Field]
-
-    class MultipartFormBody(BaseModel):
-        class Field(BaseModel):
-            value_kind: Literal['text', 'file']
-            enabled: bool
-            key: str
-            value: str | Path | None
-
-            @field_validator('value', mode='before')
-            @classmethod
-            def validate_value(cls, value: Any, info: ValidationInfo):
-                if value is None:
-                    return None
-
-                kind = info.data.get('value_kind')
-                if kind == 'file':
-                    return Path(value)
-                elif kind == 'text':
-                    return str(value)
-
-        fields: list[Field]
-
-    class BasicAuth(BaseModel):
-        username: str
-        password: str
-
-    class BearerAuth(BaseModel):
-        token: str
-
-    class ApiKeyAuth(BaseModel):
-        key: str
-        value: str
-        where: Literal['header', 'param']
-
-    class DigestAuth(BaseModel):
-        username: str
-        password: str
-
     class Options(BaseModel):
         timeout: float = 5.5
         follow_redirects: bool = True
@@ -108,7 +144,7 @@ class Request(BaseModel):
     id: int | None = None
     uuid: UUID = _Field(default_factory=uuid4)
 
-    folder_id: int | None = None
+    folder_id: int
     name: str
 
     method: HTTPMethod = HTTPMethod.GET
@@ -123,10 +159,8 @@ class Request(BaseModel):
     )
 
     auth_enabled: bool = False
-    auth_mode: AuthMode = AuthMode.BASIC
-    auth: BasicAuth | BearerAuth | ApiKeyAuth | DigestAuth = BasicAuth(
-        username='', password=''
-    )
+    auth_mode: AuthMode = AuthMode.INHERITED
+    auth: BasicAuth | BearerAuth | ApiKeyAuth | DigestAuth | None = None
 
     options: Options = _Field(default_factory=Options)
 
@@ -153,7 +187,7 @@ class Request(BaseModel):
         resolved_url = _resolve_variables(self.url)
 
         resolved_headers = [
-            self.Header(
+            Header(
                 enabled=header.enabled,
                 key=_resolve_variables(header.key),
                 value=_resolve_variables(header.value),
@@ -173,22 +207,22 @@ class Request(BaseModel):
         resolved_auth = self.auth
         if self.auth_enabled:
             if self.auth_mode == AuthMode.BASIC:
-                resolved_auth = self.BasicAuth(
+                resolved_auth = BasicAuth(
                     username=_resolve_variables(self.auth.username),
                     password=_resolve_variables(self.auth.password),
                 )
             elif self.auth_mode == AuthMode.BEARER:
-                resolved_auth = self.BearerAuth(
+                resolved_auth = BearerAuth(
                     token=_resolve_variables(self.auth.token)
                 )
             elif self.auth_mode == AuthMode.API_KEY:
-                resolved_auth = self.ApiKeyAuth(
+                resolved_auth = ApiKeyAuth(
                     key=_resolve_variables(self.auth.key),
                     value=_resolve_variables(self.auth.value),
                     where=self.auth.where,
                 )
             elif self.auth_mode == AuthMode.DIGEST:
-                resolved_auth = self.DigestAuth(
+                resolved_auth = DigestAuth(
                     username=_resolve_variables(self.auth.username),
                     password=_resolve_variables(self.auth.password),
                 )
@@ -214,9 +248,9 @@ class Request(BaseModel):
                     ]
                 )
             elif self.body_mode == BodyMode.FORM_MULTIPART:
-                resolved_body = self.MultipartFormBody(
+                resolved_body = MultipartFormBody(
                     fields=[
-                        self.MultipartFormBody.Field(
+                        MultipartFormBody.Field(
                             value_kind=field.value_kind,
                             enabled=field.enabled,
                             key=_resolve_variables(field.key),
@@ -236,12 +270,19 @@ class Request(BaseModel):
             )
         )
 
-    def to_httpx_req(self, httpx_client: httpx.AsyncClient) -> httpx.Request:
-        headers: dict[str, str] = {
+    def to_httpx_req(
+        self, httpx_client: httpx.AsyncClient, folder: Folder
+    ) -> httpx.Request:
+        headers = {
             header.key: header.value
-            for header in self.headers
+            for header in folder.headers
             if header.enabled
         }
+        for header in self.headers:
+            if not header.enabled:
+                continue
+            headers[header.key] = header.value
+
         params: dict[str, str] = {
             param.key: param.value for param in self.params if param.enabled
         }
@@ -330,11 +371,33 @@ class Request(BaseModel):
                 files=form_multipart_files,
             )
 
-    def to_httpx_auth(self) -> httpx.Auth | None:
+    def to_httpx_auth(self, folder: Folder) -> httpx.Auth | None:
         if not self.auth_enabled:
             return
 
-        if self.auth_mode == AuthMode.BASIC:
+        if self.auth_mode == AuthMode.INHERITED:
+            if folder.auth_mode == AuthMode.BASIC:
+                return httpx.BasicAuth(
+                    username=folder.auth.username,
+                    password=folder.auth.password,
+                )
+            elif folder.auth_mode == AuthMode.BEARER:
+                return httpx_auths.BearerAuth(token=folder.auth.token)
+            elif folder.auth_mode == AuthMode.API_KEY:
+                if folder.auth.where == 'header':
+                    return httpx_auths.APIKeyHeaderAuth(
+                        key=folder.auth.key, value=folder.auth.value
+                    )
+                elif folder.auth.where == 'param':
+                    return httpx_auths.APIKeyParamAuth(
+                        key=folder.auth.key, value=folder.auth.value
+                    )
+            elif folder.auth_mode == AuthMode.DIGEST:
+                return httpx.DigestAuth(
+                    username=folder.auth.username,
+                    password=folder.auth.password,
+                )
+        elif self.auth_mode == AuthMode.BASIC:
             return httpx.BasicAuth(
                 username=self.auth.username, password=self.auth.password
             )
@@ -354,6 +417,7 @@ class Request(BaseModel):
                 username=self.auth.username, password=self.auth.password
             )
 
+    # TODO: Receber folder e fazer merge dos header ajustar auth
     def to_curl(self) -> str:
         headers: dict[str, str] = {
             header.key: header.value

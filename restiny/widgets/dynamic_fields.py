@@ -34,12 +34,6 @@ class TextDynamicField(QWidget):
         self.enable_checkbox = QCheckBox()
         self.enable_checkbox.toggled.connect(self._on_enabled_or_disabled)
         self.enable_checkbox.setToolTip('Enable')
-        self.enable_checkbox.setStyleSheet("""
-QCheckBox::indicator {
-    width: 20px;
-    height: 20px;
-}
-""")
         self.enable_checkbox.setChecked(self.initial_enabled)
         self.key_input = QLineEdit()
         self.key_input.setPlaceholderText('Key')
@@ -130,12 +124,6 @@ class TextOrFileDynamicField(QWidget):
         self.enable_checkbox = QCheckBox()
         self.enable_checkbox.setChecked(self.initial_enabled)
         self.enable_checkbox.setToolTip('Enable')
-        self.enable_checkbox.setStyleSheet("""
-QCheckBox::indicator {
-    width: 20px;
-    height: 20px;
-}
-""")
         self.enable_checkbox.toggled.connect(self._on_enabled_or_disabled)
 
         self.key_input = QLineEdit(self.initial_key)
