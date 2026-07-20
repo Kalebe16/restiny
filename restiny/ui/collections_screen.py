@@ -1016,46 +1016,79 @@ class CollectionsScreen(QWidget):
             self.url_area.request_pending = False
 
     def _download_response(self, response: httpx.Response) -> None:
-        content_disposition = response.headers.get('content-disposition')
-        if content_disposition and 'filename=' in content_disposition:
-            filename = content_disposition.split('filename=')[-1].strip('"')
+        content_disposition = response.headers.get('content-disposition', '')
+
+        if 'filename=' in content_disposition:
+            filename = (
+                content_disposition.split('filename=', 1)[1].strip().strip('"')
+            )
         else:
             filename = (
-                response.url.path.removeprefix('/')
-                .removesuffix('/')
-                .replace('/', '-')
-                or 'response'
+                response.url.path.strip('/').replace('/', '-') or 'response'
             )
-        filename = filename.rsplit('.', 1)[0]
 
+        content_type = response.headers.get('content-type', '')
         content_type = response.headers.get('content-type')
         if content_type:
-            filesuffix = (
+            file_suffix = (
                 mimetypes.guess_extension(content_type.split(';')[0]) or '.bin'
             )
         else:
-            filesuffix = '.bin'
+            file_suffix = '.bin'
 
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            'Save Response',
-            f'{filename}{filesuffix}',
-            f'*{filesuffix}',
+        if not Path(filename).suffix:
+            filename = f'{filename}{file_suffix}'
+
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle('Save Response')
+        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        dialog.setFileMode(QFileDialog.FileMode.AnyFile)
+        dialog.selectFile(filename)
+        dialog.setNameFilters(
+            [
+                f'{file_suffix.upper().removeprefix(".")} files (*{file_suffix})',
+                'All files (*)',
+            ]
         )
 
-        if not file_path:
-            return
+        self._download_dialog = dialog
 
-        file = Path(file_path)
-        try:
-            file.write_bytes(response.content)
-        except OSError as error:
-            QMessageBox.critical(
-                self, 'Save Response', f'Could not save file:\n{error}'
+        def finish_dialog(result: int) -> None:
+            self._download_dialog = None
+
+            if result != QFileDialog.DialogCode.Accepted:
+                dialog.deleteLater()
+                return
+
+            selected_files = dialog.selectedFiles()
+            dialog.deleteLater()
+
+            if not selected_files:
+                return
+
+            output_path = Path(selected_files[0])
+
+            if not output_path.suffix:
+                output_path = output_path.with_suffix(file_suffix)
+
+            try:
+                output_path.write_bytes(response.content)
+            except OSError as error:
+                QMessageBox.critical(
+                    self,
+                    'Error',
+                    f'Could not save file:\n{error}',
+                )
+                return
+
+            QMessageBox.information(
+                self,
+                'Information',
+                f'File saved:\n{output_path}',
             )
-            return
 
-        QMessageBox.information(self, 'Save Response', f'File saved:\n{file}')
+        dialog.finished.connect(finish_dialog)
+        dialog.open()
 
     def _display_response(self, response: httpx.Response) -> None:
         content_type_to_body_language = {

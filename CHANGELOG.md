@@ -5,12 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [1.2.0] - 2026-07-19
+## [1.2.0] - 2026-07-20
 
 ### Added
 - Auth by folder
-- Header by folder
+- Headers by folder
 - Documentation by folder
+- Automatic system requirements installation
+
+### Fixed
+
+- Focus
+- Download response
 
 ## [1.1.0] - 2026-07-18
 

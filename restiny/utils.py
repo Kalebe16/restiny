@@ -1,4 +1,6 @@
 import shlex
+import shutil
+import subprocess
 from pathlib import Path
 
 import httpx
@@ -26,6 +28,50 @@ def fix_pyside_stylesheet(window: QMainWindow, accent_color: str) -> None:
             QCheckBox::indicator {{ width: 24px; height: 24px; }}
             """
         )
+
+
+def open_linux_terminal(command: str) -> None:
+    terminals = [
+        ('gnome-terminal', ['--', 'bash', '-c']),
+        ('ptyxis', ['--', 'bash', '-c']),
+        ('kgx', ['--', 'bash', '-c']),
+        ('konsole', ['-e', 'bash', '-c']),
+        ('xfce4-terminal', ['-e', 'bash', '-c']),
+        ('mate-terminal', ['-e', 'bash', '-c']),
+        ('lxterminal', ['-e', 'bash', '-c']),
+        ('tilix', ['-e', 'bash', '-c']),
+        ('terminator', ['-x', 'bash', '-c']),
+        ('alacritty', ['-e', 'bash', '-c']),
+        ('kitty', ['bash', '-c']),
+        ('wezterm', ['start', '--', 'bash', '-c']),
+        ('xterm', ['-e', 'bash', '-c']),
+        ('x-terminal-emulator', ['-e', 'bash', '-c']),
+    ]
+    for terminal, args in terminals:
+        if shutil.which(terminal):
+            subprocess.Popen([terminal, *args, f'{command}; exec bash'])
+            return
+
+
+def open_darwin_terminal(command: str) -> None:
+    subprocess.Popen(
+        [
+            'open',
+            '-a',
+            'Terminal',
+            command,
+        ]
+    )
+
+
+def open_windows_terminal(command: str) -> None:
+    subprocess.Popen(
+        [
+            'cmd',
+            '/k',
+            command,
+        ]
+    )
 
 
 def build_curl_cmd(

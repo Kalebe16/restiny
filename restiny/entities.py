@@ -230,14 +230,14 @@ class Request(BaseModel):
         resolved_body = self.body
         if self.body_enabled:
             if self.body_mode == BodyMode.RAW:
-                resolved_body = self.RawBody(
+                resolved_body = RawBody(
                     language=self.body.language,
                     value=_resolve_variables(self.body.value),
                 )
             elif self.body_mode == BodyMode.FILE:
                 pass
             elif self.body_mode == BodyMode.FORM_URLENCODED:
-                resolved_body = self.UrlEncodedFormBody(
+                resolved_body = UrlEncodedFormBody(
                     fields=[
                         self.UrlEncodedFormBody.Field(
                             enabled=field.enabled,
@@ -295,12 +295,13 @@ class Request(BaseModel):
         url = clean_url
 
         if not self.body_enabled:
-            return httpx_client.build_request(
+            request = httpx_client.build_request(
                 method=self.method,
                 url=self.url,
                 headers=headers,
                 params=params,
             )
+            return request
         if self.body_mode == BodyMode.RAW:
             raw_language_to_content_type = {
                 BodyRawLanguage.JSON: ContentType.JSON,
@@ -417,13 +418,17 @@ class Request(BaseModel):
                 username=self.auth.username, password=self.auth.password
             )
 
-    # TODO: Receber folder e fazer merge dos header ajustar auth
-    def to_curl(self) -> str:
-        headers: dict[str, str] = {
+    def to_curl(self, folder: Folder) -> str:
+        headers = {
             header.key: header.value
-            for header in self.headers
+            for header in folder.headers
             if header.enabled
         }
+        for header in self.headers:
+            if not header.enabled:
+                continue
+            headers[header.key] = header.value
+
         params: dict[str, str] = {
             param.key: param.value for param in self.params if param.enabled
         }
@@ -456,7 +461,25 @@ class Request(BaseModel):
         auth_api_key_param = None
         auth_digest = None
         if self.auth_enabled:
-            if self.auth_mode == AuthMode.BASIC:
+            if self.auth_mode == AuthMode.INHERITED:
+                if folder.auth_mode == AuthMode.BASIC:
+                    auth_basic = (folder.auth.username, folder.auth.password)
+                elif folder.auth_mode == AuthMode.BEARER:
+                    auth_bearer = folder.auth.token
+                elif folder.auth_mode == AuthMode.API_KEY:
+                    if folder.auth.where == 'header':
+                        auth_api_key_header = (
+                            folder.auth.key,
+                            folder.auth.value,
+                        )
+                    elif folder.auth.where == 'param':
+                        auth_api_key_param = (
+                            folder.auth.key,
+                            folder.auth.value,
+                        )
+                elif folder.auth_mode == AuthMode.DIGEST:
+                    auth_digest = (folder.auth.username, folder.auth.password)
+            elif self.auth_mode == AuthMode.BASIC:
                 auth_basic = (self.auth.username, self.auth.password)
             elif self.auth_mode == AuthMode.BEARER:
                 auth_bearer = self.auth.token
