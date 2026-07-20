@@ -40,6 +40,7 @@ class ContentType(StrEnum):
 
 
 class AuthMode(StrEnum):
+    INHERITED = 'inherited'
     BASIC = 'basic'
     BEARER = 'bearer'
     API_KEY = 'api_key'

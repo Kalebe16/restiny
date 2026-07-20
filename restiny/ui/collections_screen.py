@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QStackedWidget,
     QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
@@ -28,8 +29,22 @@ from restiny.data.repos import (
     EnvironmentsSQLRepo,
     FoldersSQLRepo,
     RequestsSQLRepo,
+    SettingsSQLRepo,
 )
-from restiny.entities import Folder, Request
+from restiny.entities import (
+    ApiKeyAuth,
+    BasicAuth,
+    BearerAuth,
+    DigestAuth,
+    FileBody,
+    Folder,
+    Header,
+    MultipartFormBody,
+    Param,
+    RawBody,
+    Request,
+    UrlEncodedFormBody,
+)
 from restiny.enums import (
     AuthMode,
     BodyMode,
@@ -37,10 +52,12 @@ from restiny.enums import (
     ContentType,
     HTTPMethod,
 )
+from restiny.ui.folder_area import FolderArea
 from restiny.ui.request_area import RequestArea
 from restiny.ui.response_area import ResponseArea
 from restiny.ui.top_bar_area import TopBarArea
 from restiny.ui.url_area import URLArea
+from restiny.utils import fix_pyside_stylesheet
 from restiny.widgets.collections_tree import CollectionsTree
 
 
@@ -72,92 +89,116 @@ class CollectionsScreen(QWidget):
         folders_repo: FoldersSQLRepo,
         requests_repo: RequestsSQLRepo,
         environments_repo: EnvironmentsSQLRepo,
+        settings_repo: SettingsSQLRepo,
     ):
         super().__init__()
         self.main_window = main_window
         self.folders_repo = folders_repo
         self.requests_repo = requests_repo
         self.environments_repo = environments_repo
+        self.settings_repo = settings_repo
+
         self._active_request_task: asyncio.Task | None = None
         self._collections_tree_showing = True
-        self._cookies: httpx.Cookies = httpx.Cookies()
+
+        self._cookies = httpx.Cookies()
+
         self._opened_requests: dict[int, Request] = {}
+        self._opened_folders: dict[int, Folder] = {}
+
         self._selected_request: Request | None = None
+        self._selected_folder: Folder | None = None
+
         self._request_id_to_response: dict[int, httpx.Response] = {}
 
         self.collections_tree = CollectionsTree()
         self.collections_tree.setHeaderHidden(True)
-        self.collections_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.collections_tree.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
+        )
         self.collections_tree.setColumnCount(2)
         self.collections_tree.setHeaderLabels(['Method', 'Name'])
-        header = self.collections_tree.header()
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # método
-        header.setSectionResizeMode(1, QHeaderView.Stretch)
+
+        collections_header = self.collections_tree.header()
+        collections_header.setSectionResizeMode(
+            0,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        collections_header.setSectionResizeMode(
+            1,
+            QHeaderView.ResizeMode.Stretch,
+        )
 
         self._populate_collections_tree(None)
-
-        def open_menu(pos):
-            item = self.collections_tree.itemAt(pos)
-            menu = QMenu(self.collections_tree)
-
-            if item:
-                item_type = item.data(0, Qt.UserRole)['type']
-
-                if item_type == 'folder':
-                    menu.addAction(
-                        'Add folder',
-                        lambda: self._on_add_folder(as_root=False),
-                    )
-                    menu.addAction(
-                        'Add request',
-                        lambda: self._on_add_request(as_root=False),
-                    )
-                    menu.addAction('Move', self._on_move_folder)
-                    menu.addAction('Rename', self._on_rename_folder)
-                    menu.addAction('Remove', self._on_remove_folder)
-                elif item_type == 'request':
-                    menu.addAction('Move', self._on_move_request)
-                    menu.addAction('Rename', self._on_rename_request)
-                    menu.addAction('Remove', self._on_remove_request)
-            else:
-                menu.addAction(
-                    'Add folder', lambda: self._on_add_folder(as_root=True)
-                )
-                menu.addAction(
-                    'Add request', lambda: self._on_add_request(as_root=True)
-                )
-
-            menu.exec(self.collections_tree.viewport().mapToGlobal(pos))
-
-        self.collections_tree.customContextMenuRequested.connect(open_menu)
 
         self.top_bar_area = TopBarArea(
             environments_repo=self.environments_repo,
             requests_repo=self.requests_repo,
+            folders_repo=self.folders_repo,
         )
+
         self.url_area = URLArea()
         self.request_area = RequestArea()
+        self.folder_area = FolderArea(settings_repo=self.settings_repo)
         self.response_area = ResponseArea()
 
-        first_row = QHBoxLayout()
-        first_row.addWidget(self.top_bar_area)
+        self.request_or_folder_stack = QStackedWidget()
+        self.request_or_folder_stack.addWidget(self.request_area)
+        self.request_or_folder_stack.addWidget(self.folder_area)
 
-        second_row = QHBoxLayout()
-        second_row.addWidget(self.url_area)
+        editor_content_layout = QHBoxLayout()
+        editor_content_layout.setContentsMargins(0, 0, 0, 0)
+        editor_content_layout.setSpacing(0)
 
-        third_row = QHBoxLayout()
-        third_row.addWidget(self.request_area, 1)
-        third_row.addWidget(self.response_area, 1)
+        editor_content_layout.addWidget(self.request_or_folder_stack, 1)
+        editor_content_layout.addWidget(self.response_area, 1)
 
-        main_content = QVBoxLayout()
-        main_content.addLayout(first_row)
-        main_content.addLayout(second_row)
-        main_content.addLayout(third_row)
+        main_content_layout = QVBoxLayout()
+        main_content_layout.setContentsMargins(0, 0, 0, 0)
+        main_content_layout.setSpacing(0)
+
+        main_content_layout.addWidget(self.top_bar_area)
+        main_content_layout.addWidget(self.url_area)
+        main_content_layout.addLayout(editor_content_layout, 1)
 
         layout = QHBoxLayout(self)
-        layout.addWidget(self.collections_tree, 1)
-        layout.addLayout(main_content, 8)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
+        layout.addWidget(self.collections_tree, 1)
+        layout.addLayout(main_content_layout, 8)
+
+        self.collections_tree.customContextMenuRequested.connect(
+            self._open_collection_menu
+        )
+        self.collections_tree.itemSelectionChanged.connect(
+            self._on_request_or_folder_selected
+        )
+        self.folder_area.sig_seted_data.connect(
+            lambda: fix_pyside_stylesheet(
+                window=self.main_window,
+                accent_color=self.settings_repo.get().data.accent_color,
+            )
+        )
+        self.folder_area.sig_edited.connect(
+            lambda: fix_pyside_stylesheet(
+                window=self.main_window,
+                accent_color=self.settings_repo.get().data.accent_color,
+            )
+        )
+        self.folder_area.sig_edited.connect(self._on_folder_edited)
+        self.request_area.sig_seted_data.connect(
+            lambda: fix_pyside_stylesheet(
+                window=self.main_window,
+                accent_color=self.settings_repo.get().data.accent_color,
+            )
+        )
+        self.request_area.sig_edited.connect(
+            lambda: fix_pyside_stylesheet(
+                window=self.main_window,
+                accent_color=self.settings_repo.get().data.accent_color,
+            )
+        )
         self.request_area.sig_edited.connect(self._on_request_edited)
         self.url_area.sig_edited.connect(self._on_request_edited)
         self.url_area.sig_send_requested.connect(
@@ -169,24 +210,71 @@ class CollectionsScreen(QWidget):
         self.url_area.sig_cancel_requested.connect(
             self._on_cancel_request_requested
         )
-        self.collections_tree.itemSelectionChanged.connect(
-            self._on_request_or_folder_selected
+        self.top_bar_area.sig_request_tab_selected.connect(
+            self._on_request_tab_selected
         )
-        self.top_bar_area.sig_tab_selected.connect(self._on_tab_selected)
+        self.top_bar_area.sig_folder_tab_selected.connect(
+            self._on_folder_tab_selected
+        )
+        self.top_bar_area.sig_request_tab_closed.connect(
+            self._on_request_tab_closed
+        )
+        self.top_bar_area.sig_folder_tab_closed.connect(
+            self._on_folder_tab_closed
+        )
         self.top_bar_area.sig_all_tabs_closed.connect(self._on_all_tabs_closed)
-        self.top_bar_area.sig_tab_closed.connect(self._on_tab_closed)
 
-        toggle_sidebar_shortcut = QShortcut(QKeySequence('Ctrl+B'), self)
-        toggle_sidebar_shortcut.activated.connect(
+        self.toggle_sidebar_shortcut = QShortcut(
+            QKeySequence('Ctrl+B'),
+            self,
+        )
+        self.save_shortcut = QShortcut(
+            QKeySequence('Ctrl+S'),
+            self,
+        )
+        self.toggle_sidebar_shortcut.activated.connect(
             self._on_toggle_collections_tree
         )
-        save_request_shortcut = QShortcut(QKeySequence('Ctrl+S'), self)
-        save_request_shortcut.activated.connect(self._on_request_saved)
+        self.save_shortcut.activated.connect(self._on_save)
 
         self.url_area.clear_data()
         self.request_area.clear_data()
+        self.response_area.clear_data()
+        self.request_or_folder_stack.setCurrentWidget(self.request_area)
         self.url_area.setDisabled(True)
         self.request_area.setDisabled(True)
+        self.folder_area.setDisabled(True)
+        self.response_area.setDisabled(True)
+
+    def _open_collection_menu(self, pos):
+        item = self.collections_tree.itemAt(pos)
+        menu = QMenu(self.collections_tree)
+
+        if item:
+            item_type = item.data(0, Qt.UserRole)['type']
+
+            if item_type == 'folder':
+                menu.addAction(
+                    'Add folder',
+                    lambda: self._on_add_folder(as_root=False),
+                )
+                menu.addAction(
+                    'Add request',
+                    self._on_add_request,
+                )
+                menu.addAction('Move', self._on_move_folder)
+                menu.addAction('Rename', self._on_rename_folder)
+                menu.addAction('Remove', self._on_remove_folder)
+            elif item_type == 'request':
+                menu.addAction('Move', self._on_move_request)
+                menu.addAction('Rename', self._on_rename_request)
+                menu.addAction('Remove', self._on_remove_request)
+        else:
+            menu.addAction(
+                'Add folder', lambda: self._on_add_folder(as_root=True)
+            )
+
+        menu.exec(self.collections_tree.viewport().mapToGlobal(pos))
 
     def _on_move_folder(self) -> None:
         folder_id = self.collections_tree.currentItemData()['id']
@@ -225,13 +313,38 @@ class CollectionsScreen(QWidget):
 
     def _on_all_tabs_closed(self) -> None:
         self._selected_request = None
+        self._selected_folder = None
         self._opened_requests = {}
+        self._opened_folders = {}
         self.collections_tree.clearSelection()
         self.collections_tree.setCurrentItem(None)
         self.url_area.clear_data()
         self.request_area.clear_data()
+        self.response_area.clear_data()
         self.url_area.setDisabled(True)
         self.request_area.setDisabled(True)
+        self.response_area.show_empty()
+        self.request_or_folder_stack.setCurrentWidget(self.request_area)
+
+    def _on_folder_edited(self) -> None:
+        if not self._selected_folder:
+            return
+
+        current_folder = self.get_folder()
+        saved_folder = self.folders_repo.get_by_id(current_folder.id).data
+
+        if not saved_folder:
+            return
+
+        current_hash = current_folder.gen_hash()
+        saved_hash = saved_folder.gen_hash()
+
+        if current_hash != saved_hash:
+            self.top_bar_area.mark_folder_unsaved_tab(current_folder.id)
+        else:
+            self.top_bar_area.mark_folder_saved_tab(current_folder.id)
+
+        self._opened_folders[current_folder.id] = current_folder
 
     def _on_request_edited(self) -> None:
         if not self._selected_request:
@@ -247,13 +360,13 @@ class CollectionsScreen(QWidget):
         saved_hash = saved_request.gen_hash()
 
         if current_hash != saved_hash:
-            self.top_bar_area.mark_unsaved_tab(current_request.id)
+            self.top_bar_area.mark_request_unsaved_tab(current_request.id)
         else:
-            self.top_bar_area.mark_saved_tab(current_request.id)
+            self.top_bar_area.mark_request_saved_tab(current_request.id)
 
         self._opened_requests[current_request.id] = current_request
 
-    def _on_tab_selected(self, request_id: int) -> None:
+    def _on_request_tab_selected(self, request_id: int) -> None:
         request = self._opened_requests[request_id]
         self._selected_request = request
         self.set_request(request=request)
@@ -271,8 +384,35 @@ class CollectionsScreen(QWidget):
                 self.collections_tree.setCurrentItem(item)
                 break
 
-    def _on_tab_closed(self, request_id: int) -> None:
+    def _on_folder_tab_selected(self, folder_id: int) -> None:
+        folder = self._opened_folders[folder_id]
+        self._selected_folder = folder
+        self.set_folder(folder=folder)
+
+        matches = self.collections_tree.findItems(
+            '', Qt.MatchContains | Qt.MatchRecursive, 0
+        )
+        for item in matches:
+            data = item.data(0, Qt.UserRole)
+            if (
+                data
+                and data.get('type') == 'folder'
+                and data.get('id') == folder_id
+            ):
+                self.collections_tree.setCurrentItem(item)
+                break
+
+    def _on_request_tab_closed(self, request_id: int) -> None:
         del self._opened_requests[request_id]
+
+    def _on_folder_tab_closed(self, folder_id: int) -> None:
+        del self._opened_folders[folder_id]
+
+    def _on_save(self) -> None:
+        if self._selected_request is not None:
+            self._on_request_saved()
+        elif self._selected_folder is not None:
+            self._on_folder_saved()
 
     def _on_request_saved(self) -> None:
         request = self.get_request()
@@ -285,10 +425,26 @@ class CollectionsScreen(QWidget):
             msg.exec()
             return
 
-        self.top_bar_area.mark_saved_tab(self._selected_request.id)
+        self.top_bar_area.mark_request_saved_tab(self._selected_request.id)
         self.top_bar_area.update_tabs()
         self.collections_tree.update_request(request)
         self.main_window.statusBar().showMessage('Request saved', 3000)
+
+    def _on_folder_saved(self) -> None:
+        folder = self.get_folder()
+        resp = self.folders_repo.update(folder)
+        if not resp.ok:
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Critical)
+            msg.setText(f'Failed to save folder ({resp.status})')
+            msg.setWindowTitle('Error')
+            msg.exec()
+            return
+
+        self.top_bar_area.mark_folder_saved_tab(self._selected_folder.id)
+        self.top_bar_area.update_tabs()
+        self.collections_tree.update_folder(folder)
+        self.main_window.statusBar().showMessage('Folder saved', 3000)
 
     def _on_request_or_folder_selected(self) -> None:
         item = self.collections_tree.currentItem()
@@ -302,21 +458,41 @@ class CollectionsScreen(QWidget):
         if not data:
             return
 
-        if data.get('type') == 'folder':
-            self.top_bar_area.setDisabled(True)
+        if data['type'] == 'folder':
+            self.request_or_folder_stack.setCurrentWidget(self.folder_area)
+            self.folder_area.setDisabled(False)
+
             self.url_area.setDisabled(True)
             self.request_area.setDisabled(True)
             self.response_area.setDisabled(True)
             self._selected_request = None
             self.url_area.clear_data()
             self.request_area.clear_data()
-        elif data.get('type') == 'request':
-            request_id = data.get('id')
+            self.response_area.clear_data()
+            self.response_area.show_empty()
+
+            folder_id = data['id']
+            if folder_id in self._opened_folders:
+                folder = self._opened_folders[folder_id]
+            else:
+                folder = self.folders_repo.get_by_id(id=folder_id).data
+                self._opened_folders[folder.id] = folder
+
+            self._selected_folder = folder
+            self.set_folder(folder)
+            self.top_bar_area.open_folder_tab(
+                folder_id=folder.id, folder_name=folder.name
+            )
+        elif data['type'] == 'request':
+            self.request_or_folder_stack.setCurrentWidget(self.request_area)
+            self.request_area.setDisabled(False)
+
             self.top_bar_area.setDisabled(False)
             self.url_area.setDisabled(False)
             self.request_area.setDisabled(False)
             self.response_area.setDisabled(False)
 
+            request_id = data['id']
             if request_id in self._opened_requests:
                 request = self._opened_requests[request_id]
             else:
@@ -347,11 +523,11 @@ class CollectionsScreen(QWidget):
             if data and data.get('type') == 'folder':
                 folder_id = data['id']
 
-        folders = (
-            self.folders_repo.get_roots().data
-            if folder_id is None
-            else self.folders_repo.get_by_parent_id(folder_id).data
-        )
+        if folder_id is None:
+            folders = self.folders_repo.get_roots().data
+        else:
+            folders = self.folders_repo.get_by_parent_id(folder_id).data
+
         requests = self.requests_repo.get_by_folder_id(folder_id).data
 
         def sort_requests(request):
@@ -394,14 +570,11 @@ class CollectionsScreen(QWidget):
         if self._active_request_task:
             self._active_request_task.cancel()
 
-    def _on_add_request(self, as_root: bool) -> None:
+    def _on_add_request(self) -> None:
         item = self.collections_tree.currentItem()
         parent_folder_id = None
         if item:
             parent_folder_id = item.data(0, Qt.UserRole)['id']
-        if as_root:
-            parent_folder_id = None
-            item = None
         dialog = AddRequestDialog(
             parent=self,
             requests_repo=self.requests_repo,
@@ -483,13 +656,60 @@ class CollectionsScreen(QWidget):
         dialog.sig_folder_removed.connect(self.top_bar_area.update_tabs)
         dialog.exec()
 
+    def get_folder(self) -> Folder:
+        headers = [
+            Header(
+                enabled=header['enabled'],
+                key=header['key'],
+                value=header['value'],
+            )
+            for header in self.folder_area.get_data()['headers']
+        ]
+
+        auth_mode = self.folder_area.get_data()['auth_mode']
+        auth = None
+        if auth_mode == AuthMode.BASIC:
+            auth = BasicAuth(
+                username=self.folder_area.get_data()['auth']['username'],
+                password=self.folder_area.get_data()['auth']['password'],
+            )
+        elif auth_mode == AuthMode.BEARER:
+            auth = BearerAuth(
+                token=self.folder_area.get_data()['auth']['token']
+            )
+        elif auth_mode == AuthMode.API_KEY:
+            auth = ApiKeyAuth(
+                key=self.folder_area.get_data()['auth']['key'],
+                value=self.folder_area.get_data()['auth']['value'],
+                where=self.folder_area.get_data()['auth']['where'],
+            )
+        elif auth_mode == AuthMode.DIGEST:
+            auth = DigestAuth(
+                username=self.folder_area.get_data()['username'],
+                password=self.folder_area.get_data()['password'],
+            )
+
+        documentation = self.folder_area.get_data()['documentation']
+        return Folder(
+            id=self._selected_folder.id,
+            uuid=self._selected_folder.uuid,
+            name=self._selected_folder.name,
+            parent_id=self._selected_folder.parent_id,
+            headers=headers,
+            auth_mode=auth_mode,
+            auth=auth,
+            documentation=documentation,
+            created_at=self._selected_folder.created_at,
+            updated_at=self._selected_folder.updated_at,
+        )
+
     # TODO: Try Request(**get_data())
     def get_request(self) -> Request:
         method = self.url_area.get_data()['method']
         url = self.url_area.get_data()['url']
 
         headers = [
-            Request.Header(
+            Header(
                 enabled=header['enabled'],
                 key=header['key'],
                 value=header['value'],
@@ -498,7 +718,7 @@ class CollectionsScreen(QWidget):
         ]
 
         params = [
-            Request.Param(
+            Param(
                 enabled=param['enabled'],
                 key=param['key'],
                 value=param['value'],
@@ -509,45 +729,45 @@ class CollectionsScreen(QWidget):
         auth_enabled = self.request_area.get_data()['auth_enabled']
         auth_mode = self.request_area.get_data()['auth_mode']
         auth = None
-        if auth_mode == AuthMode.BASIC:
-            auth = Request.BasicAuth(
+        if auth_mode == AuthMode.INHERITED:
+            auth = None
+        elif auth_mode == AuthMode.BASIC:
+            auth = BasicAuth(
                 username=self.request_area.get_data()['auth']['username'],
                 password=self.request_area.get_data()['auth']['password'],
             )
         elif auth_mode == AuthMode.BEARER:
-            auth = Request.BearerAuth(
+            auth = BearerAuth(
                 token=self.request_area.get_data()['auth']['token']
             )
         elif auth_mode == AuthMode.API_KEY:
-            auth = Request.ApiKeyAuth(
+            auth = ApiKeyAuth(
                 key=self.request_area.get_data()['auth']['key'],
                 value=self.request_area.get_data()['auth']['value'],
                 where=self.request_area.get_data()['auth']['where'],
             )
         elif auth_mode == AuthMode.DIGEST:
-            auth = Request.DigestAuth(
-                username=self.request_area.get_data()['username'],
-                password=self.request_area.get_data()['password'],
+            auth = DigestAuth(
+                username=self.request_area.get_data()['auth']['username'],
+                password=self.request_area.get_data()['auth']['password'],
             )
 
         body_enabled = self.request_area.get_data()['body_enabled']
         body_mode = self.request_area.get_data()['body_mode']
         body = None
         if body_mode == BodyMode.RAW:
-            body = Request.RawBody(
+            body = RawBody(
                 language=BodyRawLanguage(
                     self.request_area.get_data()['body']['language']
                 ),
                 value=self.request_area.get_data()['body']['value'],
             )
         elif body_mode == BodyMode.FILE:
-            body = Request.FileBody(
-                file=self.request_area.get_data()['body']['file']
-            )
+            body = FileBody(file=self.request_area.get_data()['body']['file'])
         elif body_mode == BodyMode.FORM_URLENCODED:
-            body = Request.UrlEncodedFormBody(
+            body = UrlEncodedFormBody(
                 fields=[
-                    Request.UrlEncodedFormBody.Field(
+                    UrlEncodedFormBody.Field(
                         enabled=form_field['enabled'],
                         key=form_field['key'],
                         value=form_field['value'],
@@ -558,9 +778,9 @@ class CollectionsScreen(QWidget):
                 ]
             )
         elif body_mode == BodyMode.FORM_MULTIPART:
-            body = Request.MultipartFormBody(
+            body = MultipartFormBody(
                 fields=[
-                    Request.MultipartFormBody.Field(
+                    MultipartFormBody.Field(
                         enabled=form_field['enabled'],
                         key=form_field['key'],
                         value=form_field['value'],
@@ -585,6 +805,7 @@ class CollectionsScreen(QWidget):
 
         return Request(
             id=self._selected_request.id,
+            uuid=self._selected_request.uuid,
             folder_id=self._selected_request.folder_id,
             name=self._selected_request.name,
             method=method,
@@ -610,9 +831,9 @@ class CollectionsScreen(QWidget):
         request = self.get_request().resolve_variables(
             resolved_global_environment.variables
         )
-        if self.top_bar_area.get_data()['environment_name']:
+        if self.top_bar_area.get_data()['environment']:
             environment = self.environments_repo.get_by_name(
-                name=self.top_bar_area.get_data()['environment_name']
+                name=self.top_bar_area.get_data()['environment']
             ).data
             resolved_environment = environment.resolve_variables()
             request = request.resolve_variables(resolved_environment.variables)
@@ -704,6 +925,39 @@ class CollectionsScreen(QWidget):
             }
         self.request_area.set_data(request_area_data)
 
+    def set_folder(self, folder: Folder) -> None:
+        folder_area_data = {
+            'auth_mode': folder.auth_mode,
+            'documentation': folder.documentation,
+        }
+        folder_area_data['headers'] = [
+            {
+                'enabled': field.enabled,
+                'key': field.key,
+                'value': field.value,
+            }
+            for field in folder.headers
+        ]
+        if folder.auth_mode == AuthMode.BASIC:
+            folder_area_data['auth'] = {
+                'username': folder.auth.username,
+                'password': folder.auth.password,
+            }
+        elif folder.auth_mode == AuthMode.BEARER:
+            folder_area_data['auth'] = {'token': folder.auth.token}
+        elif folder.auth_mode == AuthMode.API_KEY:
+            folder_area_data['auth'] = {
+                'where': folder.auth.where,
+                'key': folder.auth.key,
+                'value': folder.auth.value,
+            }
+        elif folder.auth_mode == AuthMode.DIGEST:
+            folder_area_data['auth'] = {
+                'username': folder.auth.username,
+                'password': folder.auth.password,
+            }
+        self.folder_area.set_data(folder_area_data)
+
     async def _send_request(self, download: bool = False) -> None:
         self.response_area.clear_data()
         self.response_area.is_loading = True
@@ -711,7 +965,9 @@ class CollectionsScreen(QWidget):
 
         try:
             request = self.get_resolved_request()
-
+            folder = self.folders_repo.get_by_id(
+                id=self._selected_request.folder_id
+            ).data
             async with httpx.AsyncClient(
                 timeout=request.options.timeout,
                 follow_redirects=request.options.follow_redirects,
@@ -721,8 +977,10 @@ class CollectionsScreen(QWidget):
                 else None,
             ) as http_client:
                 response = await http_client.send(
-                    request=request.to_httpx_req(httpx_client=http_client),
-                    auth=request.to_httpx_auth(),
+                    request=request.to_httpx_req(
+                        httpx_client=http_client, folder=folder
+                    ),
+                    auth=request.to_httpx_auth(folder=folder),
                 )
 
             if request.options.attach_cookies:
@@ -758,46 +1016,79 @@ class CollectionsScreen(QWidget):
             self.url_area.request_pending = False
 
     def _download_response(self, response: httpx.Response) -> None:
-        content_disposition = response.headers.get('content-disposition')
-        if content_disposition and 'filename=' in content_disposition:
-            filename = content_disposition.split('filename=')[-1].strip('"')
+        content_disposition = response.headers.get('content-disposition', '')
+
+        if 'filename=' in content_disposition:
+            filename = (
+                content_disposition.split('filename=', 1)[1].strip().strip('"')
+            )
         else:
             filename = (
-                response.url.path.removeprefix('/')
-                .removesuffix('/')
-                .replace('/', '-')
-                or 'response'
+                response.url.path.strip('/').replace('/', '-') or 'response'
             )
-        filename = filename.rsplit('.', 1)[0]
 
+        content_type = response.headers.get('content-type', '')
         content_type = response.headers.get('content-type')
         if content_type:
-            filesuffix = (
+            file_suffix = (
                 mimetypes.guess_extension(content_type.split(';')[0]) or '.bin'
             )
         else:
-            filesuffix = '.bin'
+            file_suffix = '.bin'
 
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            'Save Response',
-            f'{filename}{filesuffix}',
-            f'*{filesuffix}',
+        if not Path(filename).suffix:
+            filename = f'{filename}{file_suffix}'
+
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle('Save Response')
+        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        dialog.setFileMode(QFileDialog.FileMode.AnyFile)
+        dialog.selectFile(filename)
+        dialog.setNameFilters(
+            [
+                f'{file_suffix.upper().removeprefix(".")} files (*{file_suffix})',
+                'All files (*)',
+            ]
         )
 
-        if not file_path:
-            return
+        self._download_dialog = dialog
 
-        file = Path(file_path)
-        try:
-            file.write_bytes(response.content)
-        except OSError as error:
-            QMessageBox.critical(
-                self, 'Save Response', f'Could not save file:\n{error}'
+        def finish_dialog(result: int) -> None:
+            self._download_dialog = None
+
+            if result != QFileDialog.DialogCode.Accepted:
+                dialog.deleteLater()
+                return
+
+            selected_files = dialog.selectedFiles()
+            dialog.deleteLater()
+
+            if not selected_files:
+                return
+
+            output_path = Path(selected_files[0])
+
+            if not output_path.suffix:
+                output_path = output_path.with_suffix(file_suffix)
+
+            try:
+                output_path.write_bytes(response.content)
+            except OSError as error:
+                QMessageBox.critical(
+                    self,
+                    'Error',
+                    f'Could not save file:\n{error}',
+                )
+                return
+
+            QMessageBox.information(
+                self,
+                'Information',
+                f'File saved:\n{output_path}',
             )
-            return
 
-        QMessageBox.information(self, 'Save Response', f'File saved:\n{file}')
+        dialog.finished.connect(finish_dialog)
+        dialog.open()
 
     def _display_response(self, response: httpx.Response) -> None:
         content_type_to_body_language = {
@@ -812,6 +1103,7 @@ class CollectionsScreen(QWidget):
         mimetype = content_type.split(';', 1)[0].strip().lower()
 
         response_data = {
+            'request_url': self.url_area.get_data()['url'],
             'status': HTTPStatus(response.status_code),
             'content_size': response.num_bytes_downloaded,
             'elapsed_time': round(response.elapsed.total_seconds(), 2),

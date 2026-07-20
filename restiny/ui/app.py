@@ -46,7 +46,21 @@ from restiny.data.repos import (
     RequestsSQLRepo,
     SettingsSQLRepo,
 )
-from restiny.entities import Environment, Folder, Request
+from restiny.entities import (
+    ApiKeyAuth,
+    BasicAuth,
+    BearerAuth,
+    DigestAuth,
+    Environment,
+    FileBody,
+    Folder,
+    Header,
+    MultipartFormBody,
+    Param,
+    RawBody,
+    Request,
+    UrlEncodedFormBody,
+)
 from restiny.enums import AuthMode, BodyMode, BodyRawLanguage
 from restiny.ui.collections_screen import CollectionsScreen
 from restiny.ui.environments_screen import EnvironmentScreen
@@ -109,82 +123,123 @@ class ExportedEnvironmentFileV1(BaseModel):
         return v
 
 
+class ExportedHeader(BaseModel):
+    enabled: bool
+    key: str
+    value: str
+
+
+class ExportedParam(BaseModel):
+    enabled: bool
+    key: str
+    value: str
+
+
+class ExportedFileBody(BaseModel):
+    file: str | None
+
+
+class ExportedUrlEncodedFormBody(BaseModel):
+    class Field(BaseModel):
+        enabled: bool
+        key: str
+        value: str
+
+    fields: list[Field]
+
+
+class ExportedMultipartFormBody(BaseModel):
+    class Field(BaseModel):
+        value_kind: Literal['text', 'file']
+        enabled: bool
+        key: str
+        value: str | None
+
+    fields: list[Field]
+
+
+class ExportedBasicAuth(BaseModel):
+    username: str
+    password: str
+
+
+class ExportedBearerAuth(BaseModel):
+    token: str
+
+
+class ExportedApiKeyAuth(BaseModel):
+    key: str
+    value: str
+    where: Literal['header', 'param']
+
+
+class ExportedDigestAuth(BaseModel):
+    username: str
+    password: str
+
+
 class ExportedFolder(BaseModel):
     uuid: UUID
     parent_uuid: UUID | None = None
     name: str
+    headers: ExportedHeader
+    auth_mode: AuthMode
+    auth: (
+        ExportedBasicAuth
+        | ExportedBearerAuth
+        | ExportedApiKeyAuth
+        | ExportedDigestAuth
+    )
+    description: str
 
-    def to_domain(self, folder_id: int) -> Folder:
+    def to_domain(self) -> Folder:
+        auth = None
+        if self.auth_mode == AuthMode.BASIC:
+            auth = ExportedBasicAuth(
+                username=self.auth.username, password=self.auth.password
+            )
+        elif self.auth_mode == AuthMode.BEARER:
+            auth = ExportedBearerAuth(token=self.auth.token)
+        elif self.auth_mode == AuthMode.API_KEY:
+            auth = ExportedApiKeyAuth(
+                where=self.auth.where, key=self.auth.key, value=self.auth.value
+            )
+        elif self.auth_mode == AuthMode.DIGEST:
+            auth = ExportedDigestAuth(
+                username=self.auth.username, password=self.auth.password
+            )
         return Folder(
-            parent_id=folder_id,
-            name=self.name,
             uuid=self.uuid,
+            name=self.name,
+            headers=[
+                Header(
+                    enabled=header.enabled, key=header.key, value=header.value
+                )
+                for header in self.headers
+            ],
+            auth_mode=self.auth_mode,
+            auth=auth,
         )
 
 
+class ExportedRawBody(BaseModel):
+    language: BodyRawLanguage
+    value: str | dict | list
+
+    @model_validator(mode='after')
+    def validate_value(self):
+        if self.language == BodyRawLanguage.JSON and not isinstance(
+            self.value, (dict, list)
+        ):
+            raise ValueError('JSON body must be dict or list')
+        if self.language != BodyRawLanguage.JSON and not isinstance(
+            self.value, str
+        ):
+            raise ValueError('Non-JSON body must be string')
+        return self
+
+
 class ExportedRequest(BaseModel):
-    class ExportedHeader(BaseModel):
-        enabled: bool
-        key: str
-        value: str
-
-    class ExportedParam(BaseModel):
-        enabled: bool
-        key: str
-        value: str
-
-    class RawBody(BaseModel):
-        language: BodyRawLanguage
-        value: str | dict | list
-
-        @model_validator(mode='after')
-        def validate_value(self):
-            if self.language == BodyRawLanguage.JSON and not isinstance(
-                self.value, (dict, list)
-            ):
-                raise ValueError('JSON body must be dict or list')
-            if self.language != BodyRawLanguage.JSON and not isinstance(
-                self.value, str
-            ):
-                raise ValueError('Non-JSON body must be string')
-            return self
-
-    class FileBody(BaseModel):
-        file: str | None
-
-    class UrlEncodedFormBody(BaseModel):
-        class Field(BaseModel):
-            enabled: bool
-            key: str
-            value: str
-
-        fields: list[Field]
-
-    class MultipartFormBody(BaseModel):
-        class Field(BaseModel):
-            value_kind: Literal['text', 'file']
-            enabled: bool
-            key: str
-            value: str | None
-
-        fields: list[Field]
-
-    class BasicAuth(BaseModel):
-        username: str
-        password: str
-
-    class BearerAuth(BaseModel):
-        token: str
-
-    class ApiKeyAuth(BaseModel):
-        key: str
-        value: str
-        where: Literal['header', 'param']
-
-    class DigestAuth(BaseModel):
-        username: str
-        password: str
-
     class Options(BaseModel):
         timeout: float = 5.5
         follow_redirects: bool = True
@@ -199,23 +254,30 @@ class ExportedRequest(BaseModel):
     headers: list[ExportedHeader] = []
     params: list[ExportedParam] = []
 
-    body_enabled: bool = False
-    body_mode: BodyMode = BodyMode.RAW
-    body: RawBody | FileBody | UrlEncodedFormBody | MultipartFormBody = (
-        RawBody(language=BodyRawLanguage.PLAIN, value='')
+    body_enabled: bool
+    body_mode: BodyMode
+    body: (
+        ExportedRawBody
+        | ExportedFileBody
+        | ExportedUrlEncodedFormBody
+        | ExportedMultipartFormBody
     )
 
-    auth_enabled: bool = False
-    auth_mode: AuthMode = AuthMode.BASIC
-    auth: BasicAuth | BearerAuth | ApiKeyAuth | DigestAuth = BasicAuth(
-        username='', password=''
-    )
+    auth_enabled: bool
+    auth_mode: AuthMode
+    auth: (
+        ExportedBasicAuth
+        | ExportedBearerAuth
+        | ExportedApiKeyAuth
+        | ExportedDigestAuth
+        | None
+    ) = None
 
-    options: Options = Options()
+    options: Options
 
     def to_domain(self, folder_id: int) -> Request:
-        if isinstance(self.body, ExportedRequest.RawBody):
-            body = Request.RawBody(
+        if isinstance(self.body, ExportedRawBody):
+            body = RawBody(
                 language=self.body.language,
                 value=(
                     json.dumps(self.body.value, ensure_ascii=False, indent=2)
@@ -223,45 +285,45 @@ class ExportedRequest(BaseModel):
                     else str(self.body.value)
                 ),
             )
-        elif isinstance(self.body, ExportedRequest.FileBody):
-            body = Request.FileBody(
+        elif isinstance(self.body, ExportedFileBody):
+            body = FileBody(
                 file=Path(self.body.file) if self.body.file else None
             )
-        elif isinstance(self.body, ExportedRequest.UrlEncodedFormBody):
-            body = Request.UrlEncodedFormBody(
+        elif isinstance(self.body, ExportedUrlEncodedFormBody):
+            body = UrlEncodedFormBody(
                 fields=[
-                    Request.UrlEncodedFormBody.Field(**f.model_dump())
+                    UrlEncodedFormBody.Field(**f.model_dump())
                     for f in self.body.fields
                 ]
             )
-        elif isinstance(self.body, ExportedRequest.MultipartFormBody):
-            body = Request.MultipartFormBody(
+        elif isinstance(self.body, ExportedMultipartFormBody):
+            body = MultipartFormBody(
                 fields=[
-                    Request.MultipartFormBody.Field(**f.model_dump())
+                    MultipartFormBody.Field(**f.model_dump())
                     for f in self.body.fields
                 ]
             )
         else:
-            body = Request.RawBody(language=BodyRawLanguage.PLAIN, value='')
+            body = RawBody(language=BodyRawLanguage.PLAIN, value='')
 
-        if isinstance(self.auth, ExportedRequest.BasicAuth):
-            auth = Request.BasicAuth(**self.auth.model_dump())
-        elif isinstance(self.auth, ExportedRequest.BearerAuth):
-            auth = Request.BearerAuth(**self.auth.model_dump())
-        elif isinstance(self.auth, ExportedRequest.ApiKeyAuth):
-            auth = Request.ApiKeyAuth(**self.auth.model_dump())
-        elif isinstance(self.auth, ExportedRequest.DigestAuth):
-            auth = Request.DigestAuth(**self.auth.model_dump())
+        if isinstance(self.auth, ExportedBasicAuth):
+            auth = BasicAuth(**self.auth.model_dump())
+        elif isinstance(self.auth, ExportedBearerAuth):
+            auth = BearerAuth(**self.auth.model_dump())
+        elif isinstance(self.auth, ExportedApiKeyAuth):
+            auth = ApiKeyAuth(**self.auth.model_dump())
+        elif isinstance(self.auth, ExportedDigestAuth):
+            auth = DigestAuth(**self.auth.model_dump())
         else:
-            auth = Request.BasicAuth(username='', password='')
+            auth = BasicAuth(username='', password='')
 
         return Request(
             folder_id=folder_id,
             name=self.name,
             method=self.method,
             url=self.url,
-            headers=[Request.Header(**h.model_dump()) for h in self.headers],
-            params=[Request.Param(**p.model_dump()) for p in self.params],
+            headers=[Header(**h.model_dump()) for h in self.headers],
+            params=[Param(**p.model_dump()) for p in self.params],
             body_enabled=self.body_enabled,
             body_mode=self.body_mode,
             body=body,
@@ -276,8 +338,48 @@ class ExportedRequest(BaseModel):
 class ExportedCollection(BaseModel):
     uuid: UUID
     name: str
+    headers: list[ExportedHeader]
+    auth_mode: AuthMode
+    auth: (
+        ExportedBasicAuth
+        | ExportedBearerAuth
+        | ExportedApiKeyAuth
+        | ExportedDigestAuth
+    )
+    documentation: str
     folders: list[ExportedFolder] = []
     requests: list[ExportedRequest] = []
+
+    def to_domain(self) -> Folder:
+        auth = None
+        if self.auth_mode == AuthMode.BASIC:
+            auth = BasicAuth(
+                username=self.auth.username, password=self.auth.password
+            )
+        elif self.auth_mode == AuthMode.BEARER:
+            auth = BearerAuth(token=self.auth.token)
+        elif self.auth_mode == AuthMode.API_KEY:
+            auth = ApiKeyAuth(
+                where=self.auth.where, key=self.auth.key, value=self.auth.value
+            )
+        elif self.auth_mode == AuthMode.DIGEST:
+            auth = DigestAuth(
+                username=self.auth.username, password=self.auth.password
+            )
+        return Folder(
+            parent_id=None,
+            uuid=self.uuid,
+            name=self.name,
+            headers=[
+                Header(
+                    enabled=header.enabled, key=header.key, value=header.value
+                )
+                for header in self.headers
+            ],
+            auth_mode=self.auth_mode,
+            auth=auth,
+            documentation=self.documentation,
+        )
 
 
 class ExportedCollectionFileV1(BaseModel):
@@ -303,7 +405,6 @@ class ExportedCollectionFileV1(BaseModel):
 class MainWindow(QMainWindow):
     def __init__(
         self,
-        app,
         db_manager: DBManager,
         folders_repo: FoldersSQLRepo,
         requests_repo: RequestsSQLRepo,
@@ -311,7 +412,6 @@ class MainWindow(QMainWindow):
         settings_repo: SettingsSQLRepo,
     ) -> None:
         super().__init__()
-        self.app = app
         self.db_manager = db_manager
         self.folders_repo = folders_repo
         self.requests_repo = requests_repo
@@ -402,12 +502,15 @@ class MainWindow(QMainWindow):
             folders_repo=self.folders_repo,
             requests_repo=self.requests_repo,
             environments_repo=self.environments_repo,
+            settings_repo=self.settings_repo,
         )
         self.environments_screen = EnvironmentScreen(
-            environments_repo=self.environments_repo
+            main_window=self,
+            environments_repo=self.environments_repo,
+            settings_repo=self.settings_repo,
         )
         self.settings_screen = SettingsScreen(
-            app=self.app, settings_repo=self.settings_repo
+            main_window=self, settings_repo=self.settings_repo
         )
 
         self.stack = QStackedWidget()
@@ -421,13 +524,13 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.stack, 12)
         self.setCentralWidget(container)
 
-        self.environments_screen.sig_environment_added.connect(
+        self.environments_screen.sig_added.connect(
             self.collections_screen.top_bar_area._populate_environments
         )
-        self.environments_screen.sig_environment_removed.connect(
+        self.environments_screen.sig_removed.connect(
             self.collections_screen.top_bar_area._populate_environments
         )
-        self.environments_screen.sig_environment_saved.connect(
+        self.environments_screen.sig_saved.connect(
             self.collections_screen.top_bar_area._populate_environments
         )
         QTimer.singleShot(3000, self._check_new_release)
@@ -628,7 +731,7 @@ class MainWindow(QMainWindow):
                         auth_block = request_block.get('auth', {})
 
                         headers = [
-                            Request.Header(
+                            Header(
                                 enabled=not header.get('disabled', False),
                                 key=header['key'] or '',
                                 value=header['value'] or '',
@@ -636,7 +739,7 @@ class MainWindow(QMainWindow):
                             for header in request_block.get('header', [])
                         ]
                         params = [
-                            Request.Param(
+                            Param(
                                 enabled=not param.get('disabled', False),
                                 key=param['key'] or '',
                                 value=param['value'] or '',
@@ -646,7 +749,7 @@ class MainWindow(QMainWindow):
 
                         body_enabled = False
                         body_mode = BodyMode.RAW
-                        body = Request.RawBody(
+                        body = RawBody(
                             language=BodyRawLanguage.PLAIN, value=''
                         )
                         if body_block:
@@ -658,7 +761,7 @@ class MainWindow(QMainWindow):
                                 }
                                 body_enabled = True
                                 body_mode = BodyMode.RAW
-                                body = Request.RawBody(
+                                body = RawBody(
                                     language=postman_language_to_restiny_language.get(
                                         body_block.get('options', {})
                                         .get('raw', {})
@@ -670,9 +773,9 @@ class MainWindow(QMainWindow):
                             elif body_block['mode'] == 'formdata':
                                 body_enabled = True
                                 body_mode = BodyMode.FORM_MULTIPART
-                                body = Request.MultipartFormBody(
+                                body = MultipartFormBody(
                                     fields=[
-                                        Request.MultipartFormBody.Field(
+                                        MultipartFormBody.Field(
                                             value_kind=field['type'],
                                             enabled=not field.get(
                                                 'disabled', False
@@ -688,9 +791,9 @@ class MainWindow(QMainWindow):
                             elif body_block['mode'] == 'urlencoded':
                                 body_enabled = True
                                 body_mode = BodyMode.FORM_URLENCODED
-                                body = Request.UrlEncodedFormBody(
+                                body = UrlEncodedFormBody(
                                     fields=[
-                                        Request.UrlEncodedFormBody.Field(
+                                        UrlEncodedFormBody.Field(
                                             enabled=not field.get(
                                                 'disabled', False
                                             ),
@@ -703,7 +806,7 @@ class MainWindow(QMainWindow):
 
                         auth_enabled = False
                         auth_mode = AuthMode.BASIC
-                        auth = Request.BasicAuth(username='', password='')
+                        auth = BasicAuth(username='', password='')
                         if auth_block:
                             if auth_block['type'] == 'basic':
                                 auth_enabled = True
@@ -715,14 +818,14 @@ class MainWindow(QMainWindow):
                                         auth_basic_username = item['value']
                                     elif item['key'] == 'password':
                                         auth_basic_password = item['value']
-                                auth = Request.BasicAuth(
+                                auth = BasicAuth(
                                     username=auth_basic_username,
                                     password=auth_basic_password,
                                 )
                             elif auth_block['type'] == 'bearer':
                                 auth_enabled = True
                                 auth_mode = AuthMode.BEARER
-                                auth = Request.BearerAuth(
+                                auth = BearerAuth(
                                     token=auth_block['bearer'][0]['value']
                                 )
                             elif auth_block['type'] == 'apikey':
@@ -738,7 +841,7 @@ class MainWindow(QMainWindow):
                                         auth_api_key_value = item['value']
                                     elif item['key'] == 'in':
                                         auth_api_key_where = item['value']
-                                auth = Request.ApiKeyAuth(
+                                auth = ApiKeyAuth(
                                     key=auth_api_key_key,
                                     value=auth_api_key_value,
                                     where=auth_api_key_where,
@@ -753,7 +856,7 @@ class MainWindow(QMainWindow):
                                         auth_digest_username = item['value']
                                     elif item['key'] == 'password':
                                         auth_digest_password = item['value']
-                                auth = Request.DigestAuth(
+                                auth = DigestAuth(
                                     username=auth_digest_username,
                                     password=auth_digest_password,
                                 )
@@ -964,9 +1067,7 @@ class MainWindow(QMainWindow):
         collection = exported_collection_file.collection
         id_map: dict[str, int] = {}
 
-        root_folder = self.folders_repo.create(
-            Folder(parent_id=None, name=collection.name, uuid=collection.uuid)
-        ).data
+        root_folder = self.folders_repo.create(collection.to_domain()).data
         id_map[str(root_folder.uuid)] = root_folder.id
 
         for folder in collection.folders:
@@ -1051,6 +1152,12 @@ class MainWindow(QMainWindow):
             'collection': {
                 'uuid': str(collection.uuid),
                 'name': collection.name,
+                'headers': [
+                    header.model_dump() for header in collection.headers
+                ],
+                'auth_mode': collection.auth_mode,
+                'auth': collection.auth.model_dump(),
+                'documentation': collection.documentation,
                 'folders': all_folders,
                 'requests': all_requests,
             },
@@ -1171,22 +1278,19 @@ class MainWindow(QMainWindow):
                     ):
                         form_data_kind = 'multipart'
 
-                    headers: list[Request.Header] = []
-                    params: list[Request.Param] = []
+                    headers: list[Header] = []
+                    params: list[Param] = []
                     form_data_fields: list[
-                        Request.MultipartFormBody.Field
-                        | Request.UrlEncodedFormBody.Field
+                        MultipartFormBody.Field | UrlEncodedFormBody.Field
                     ] = []
                     body_enabled = False
                     body_mode = BodyMode.RAW
-                    body = Request.RawBody(
-                        language=BodyRawLanguage.PLAIN, value=''
-                    )
+                    body = RawBody(language=BodyRawLanguage.PLAIN, value='')
 
                     for parameter in operation.get('parameters', []):
                         if parameter['in'] == 'header':
                             headers.append(
-                                Request.Header(
+                                Header(
                                     enabled=False,
                                     key=parameter['name'],
                                     value='',
@@ -1194,7 +1298,7 @@ class MainWindow(QMainWindow):
                             )
                         elif parameter['in'] == 'query':
                             params.append(
-                                Request.Param(
+                                Param(
                                     enabled=False,
                                     key=parameter['name'],
                                     value='',
@@ -1204,7 +1308,7 @@ class MainWindow(QMainWindow):
                             if form_data_kind == 'urlencoded':
                                 body_mode = BodyMode.FORM_URLENCODED
                                 form_data_fields.append(
-                                    Request.UrlEncodedFormBody.Field(
+                                    UrlEncodedFormBody.Field(
                                         enabled=False,
                                         key=parameter['name'],
                                         value='',
@@ -1213,7 +1317,7 @@ class MainWindow(QMainWindow):
                             elif form_data_kind == 'multipart':
                                 body_mode = BodyMode.FORM_MULTIPART
                                 form_data_fields.append(
-                                    Request.MultipartFormBody.Field(
+                                    MultipartFormBody.Field(
                                         enabled=False,
                                         key=parameter['name'],
                                         value=''
@@ -1226,7 +1330,7 @@ class MainWindow(QMainWindow):
                                 )
                         elif parameter['in'] == 'body':
                             body_mode = BodyMode.RAW
-                            body = Request.RawBody(
+                            body = RawBody(
                                 language=BodyRawLanguage.JSON,
                                 value=json.dumps(
                                     self._build_json_body_from_schema(
@@ -1239,13 +1343,9 @@ class MainWindow(QMainWindow):
                             )
 
                     if body_mode == BodyMode.FORM_URLENCODED:
-                        body = Request.UrlEncodedFormBody(
-                            fields=form_data_fields
-                        )
+                        body = UrlEncodedFormBody(fields=form_data_fields)
                     elif body_mode == BodyMode.FORM_MULTIPART:
-                        body = Request.MultipartFormBody(
-                            fields=form_data_fields
-                        )
+                        body = MultipartFormBody(fields=form_data_fields)
 
                     folder_id = root_folder.id
                     if operation.get('tags'):
@@ -1308,18 +1408,16 @@ class MainWindow(QMainWindow):
                 url = base_url + path
 
                 for method, operation in methods.items():
-                    headers: list[Request.Header] = []
-                    params: list[Request.Param] = []
+                    headers: list[Header] = []
+                    params: list[Param] = []
                     body_enabled = False
                     body_mode = BodyMode.RAW
-                    body = Request.RawBody(
-                        language=BodyRawLanguage.PLAIN, value=''
-                    )
+                    body = RawBody(language=BodyRawLanguage.PLAIN, value='')
 
                     for parameter in operation.get('parameters', []):
                         if parameter.get('in') == 'header':
                             headers.append(
-                                Request.Header(
+                                Header(
                                     enabled=False,
                                     key=parameter['name'],
                                     value='',
@@ -1327,7 +1425,7 @@ class MainWindow(QMainWindow):
                             )
                         elif parameter.get('in') == 'query':
                             params.append(
-                                Request.Param(
+                                Param(
                                     enabled=False,
                                     key=parameter['name'],
                                     value='',
@@ -1359,7 +1457,7 @@ class MainWindow(QMainWindow):
                             )
 
                             body_mode = BodyMode.RAW
-                            body = Request.RawBody(
+                            body = RawBody(
                                 language=BodyRawLanguage.JSON,
                                 value=json.dumps(
                                     self._build_json_body_from_schema(
@@ -1380,9 +1478,9 @@ class MainWindow(QMainWindow):
                             )
 
                             body_mode = BodyMode.FORM_URLENCODED
-                            body = Request.UrlEncodedFormBody(
+                            body = UrlEncodedFormBody(
                                 fields=[
-                                    Request.UrlEncodedFormBody.Field(
+                                    UrlEncodedFormBody.Field(
                                         enabled=False,
                                         key=prop_key,
                                         value=str(prop.get('example', '')),
@@ -1404,9 +1502,9 @@ class MainWindow(QMainWindow):
                             )
 
                             body_mode = BodyMode.FORM_MULTIPART
-                            body = Request.MultipartFormBody(
+                            body = MultipartFormBody(
                                 fields=[
-                                    Request.MultipartFormBody.Field(
+                                    MultipartFormBody.Field(
                                         enabled=False,
                                         key=prop_key,
                                         value=None

@@ -2,6 +2,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
+    QMainWindow,
     QMessageBox,
     QPushButton,
     QVBoxLayout,
@@ -13,13 +14,16 @@ from restiny.data.repos import (
 )
 from restiny.entities import Settings
 from restiny.themes import dark, light
+from restiny.utils import fix_pyside_stylesheet
 from restiny.widgets.color_picker import ColorPicker
 
 
 class SettingsScreen(QWidget):
-    def __init__(self, app, settings_repo: SettingsSQLRepo) -> None:
+    def __init__(
+        self, main_window: QMainWindow, settings_repo: SettingsSQLRepo
+    ) -> None:
         super().__init__()
-        self.app = app
+        self.main_window = main_window
         self.settings_repo = settings_repo
 
         self.theme_label = QLabel('Theme')
@@ -64,6 +68,10 @@ class SettingsScreen(QWidget):
             dark(accent_color=accent_color)
         elif self.theme_combo_box.currentText() == 'light':
             light(accent_color=accent_color)
+        fix_pyside_stylesheet(
+            window=self.main_window,
+            accent_color=accent_color,
+        )
 
         resp = self.settings_repo.set(
             settings=Settings(

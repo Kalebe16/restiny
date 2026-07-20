@@ -1,9 +1,13 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (
     QComboBox,
+    QDialog,
     QGroupBox,
+    QHBoxLayout,
     QHeaderView,
     QLabel,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -18,9 +22,10 @@ NO_RESPONSE_TEXT = "No response yet. Press 'Send' or 'Download' to continue."
 
 
 class ResponseArea(QWidget):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._is_loading = False
+        self._request_url: str | None = None
 
         self.no_response_label = QLabel()
         self.no_response_label.setText(NO_RESPONSE_TEXT)
@@ -63,9 +68,20 @@ class ResponseArea(QWidget):
             self._on_text_type_changed
         )
 
+        self.html_preview_button = QPushButton()
+        self.html_preview_button.setText('Preview')
+        self.html_preview_button.hide()
+
+        body_first_row = QHBoxLayout()
+        body_first_row.addWidget(self.body_text_editor)
+
+        body_second_row = QHBoxLayout()
+        body_second_row.addWidget(self.body_raw_language_combobox, 1)
+        body_second_row.addWidget(self.html_preview_button)
+
         body_layout = QVBoxLayout(body_tab)
-        body_layout.addWidget(self.body_text_editor)
-        body_layout.addWidget(self.body_raw_language_combobox)
+        body_layout.addLayout(body_first_row)
+        body_layout.addLayout(body_second_row)
 
         self.tabs.addTab(headers_tab, 'Headers')
         self.tabs.addTab(body_tab, 'Body')
@@ -80,6 +96,8 @@ class ResponseArea(QWidget):
         layout = QVBoxLayout(self)
         layout.addWidget(self.group_box)
         self.show_empty()
+
+        self.html_preview_button.clicked.connect(self._on_html_preview)
 
     @property
     def is_loading(self) -> bool:
@@ -122,6 +140,13 @@ class ResponseArea(QWidget):
             data['body_raw_language']
         )
 
+        if data['body_raw_language'] == BodyRawLanguage.HTML:
+            self.html_preview_button.show()
+        else:
+            self.html_preview_button.hide()
+
+        self._request_url = data['request_url']
+
     def clear_data(self):
         self.group_box.setTitle('Response')
         self.headers_table.clearContents()
@@ -139,3 +164,22 @@ class ResponseArea(QWidget):
                 'detectIndentation': False,
             },
         )
+
+    def _on_html_preview(self) -> None:
+        html_content = self.body_text_editor.get_text()
+        if not html_content:
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Preview')
+        dialog.resize(800, 400)
+
+        layout = QVBoxLayout(dialog)
+
+        browser = QWebEngineView(dialog)
+        browser.setHtml(html_content, baseUrl=QUrl(self._request_url))
+
+        layout.addWidget(browser)
+        dialog.setLayout(layout)
+
+        dialog.exec()

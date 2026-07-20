@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QListWidget,
+    QMainWindow,
     QMessageBox,
     QPushButton,
     QVBoxLayout,
@@ -13,19 +14,28 @@ from PySide6.QtWidgets import (
 
 from restiny.data.repos import (
     EnvironmentsSQLRepo,
+    SettingsSQLRepo,
 )
 from restiny.entities import Environment
+from restiny.utils import fix_pyside_stylesheet
 from restiny.widgets.dynamic_fields import DynamicFields, TextDynamicField
 
 
 class EnvironmentScreen(QWidget):
-    sig_environment_removed = Signal()
-    sig_environment_added = Signal()
-    sig_environment_saved = Signal()
+    sig_removed = Signal()
+    sig_added = Signal()
+    sig_saved = Signal()
 
-    def __init__(self, environments_repo: EnvironmentsSQLRepo):
+    def __init__(
+        self,
+        main_window: QMainWindow,
+        environments_repo: EnvironmentsSQLRepo,
+        settings_repo: SettingsSQLRepo,
+    ) -> None:
         super().__init__()
+        self.main_window = main_window
         self.environments_repo = environments_repo
+        self.settings_repo = settings_repo
         self.selected_environment: Environment | None = None
 
         self.add_environment_button = QPushButton('Add')
@@ -65,6 +75,12 @@ class EnvironmentScreen(QWidget):
         layout.addLayout(left_col, 1)
         layout.addLayout(self.right_col, 4)
 
+        self.variables_dynamic_fields.sig_edited.connect(
+            lambda: fix_pyside_stylesheet(
+                window=self.main_window,
+                accent_color=self.settings_repo.get().data.accent_color,
+            )
+        )
         self.remove_environment_button.clicked.connect(
             self._on_remove_environment
         )
@@ -123,7 +139,7 @@ class EnvironmentScreen(QWidget):
         dialog = AddEnvironmentDialog(
             parent=self, environments_repo=self.environments_repo
         )
-        dialog.sig_environment_added.connect(self._populate_environments)
+        dialog.sig_added.connect(self._populate_environments)
         dialog.exec()
 
         new_name = dialog.name_input.text()
@@ -137,7 +153,7 @@ class EnvironmentScreen(QWidget):
             )
             self._on_select_environment(index)
 
-        self.sig_environment_added.emit()
+        self.sig_added.emit()
 
     def _on_save_environment(self) -> None:
         variables = []
@@ -172,7 +188,7 @@ class EnvironmentScreen(QWidget):
         msg.exec()
         self._populate_environments()
 
-        self.sig_environment_saved.emit()
+        self.sig_saved.emit()
 
     def _on_remove_environment(self) -> None:
         dialog = RemoveEnvironmentDialog(
@@ -180,7 +196,7 @@ class EnvironmentScreen(QWidget):
             environemnts_repo=self.environments_repo,
             environment_name=self.selected_environment.name,
         )
-        dialog.sig_environment_removed.connect(self._populate_environments)
+        dialog.sig_removed.connect(self._populate_environments)
         dialog.exec()
 
         environments_list_items = self.environments_list.findItems(
@@ -193,11 +209,11 @@ class EnvironmentScreen(QWidget):
             )
             self._on_select_environment(index)
 
-        self.sig_environment_removed.emit()
+        self.sig_removed.emit()
 
 
 class RemoveEnvironmentDialog(QDialog):
-    sig_environment_removed = Signal()
+    sig_removed = Signal()
 
     def __init__(
         self,
@@ -253,12 +269,12 @@ class RemoveEnvironmentDialog(QDialog):
             msg.exec()
             return
 
-        self.sig_environment_removed.emit()
+        self.sig_removed.emit()
         self.accept()
 
 
 class AddEnvironmentDialog(QDialog):
-    sig_environment_added = Signal()
+    sig_added = Signal()
 
     def __init__(
         self, parent: QWidget, environments_repo: EnvironmentsSQLRepo
@@ -324,5 +340,5 @@ class AddEnvironmentDialog(QDialog):
             msg.exec()
             return
 
-        self.sig_environment_added.emit()
+        self.sig_added.emit()
         self.accept()

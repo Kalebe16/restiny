@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PySide6.QtCore import QLocale, Qt, Signal
+from PySide6.QtCore import QLocale, QSignalBlocker, Qt, Signal
 from PySide6.QtGui import QDoubleValidator
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -29,6 +29,7 @@ from restiny.widgets.password_input import PasswordInput
 
 class RequestArea(QWidget):
     sig_edited = Signal()
+    sig_seted_data = Signal()
 
     def __init__(self):
         super().__init__()
@@ -57,6 +58,10 @@ class RequestArea(QWidget):
 
         # Auth
         self.auth_stack = QStackedWidget()
+
+        # Inherited Auth
+        self.inherited_widget = QWidget()
+        self.auth_stack.addWidget(self.inherited_widget)
 
         # Basic Auth
         self.auth_basic_username_input = QLineEdit()
@@ -133,12 +138,6 @@ class RequestArea(QWidget):
         self.auth_stack.addWidget(digest_widget)
 
         self.auth_enabled_checkbox = QCheckBox()
-        self.auth_enabled_checkbox.setStyleSheet("""
-        QCheckBox::indicator {
-            width: 20px;
-            height: 20px;
-        }
-        """)
         self.auth_mode_combobox = QComboBox()
         self.auth_mode_combobox.addItems([mode for mode in AuthMode])
         self.auth_mode_combobox.currentIndexChanged.connect(
@@ -157,12 +156,6 @@ class RequestArea(QWidget):
         # Body
         self.body_enable_checkbox = QCheckBox()
         self.body_enable_checkbox.setChecked(False)
-        self.body_enable_checkbox.setStyleSheet("""
-        QCheckBox::indicator {
-            width: 20px;
-            height: 20px;
-        }
-        """)
 
         self.body_mode_combobox = QComboBox()
         self.body_mode_combobox.addItems(
@@ -268,35 +261,13 @@ class RequestArea(QWidget):
         validator.setLocale(QLocale.c())
         self.options_timeout_input.setValidator(validator)
 
-        self.options_follow_redirects_checkbox = QCheckBox()
-        self.options_follow_redirects_checkbox.setStyleSheet("""
-QCheckBox::indicator {
-    width: 20px;
-    height: 20px;
-}
-""")
-        self.options_follow_redirects_label = QLabel()
-        self.options_follow_redirects_label.setText('Follow redirects')
+        self.options_follow_redirects_checkbox = QCheckBox('Follow redirects')
 
-        self.options_verify_ssl_checkbox = QCheckBox()
-        self.options_verify_ssl_checkbox.setStyleSheet("""
-QCheckBox::indicator {
-    width: 20px;
-    height: 20px;
-}
-""")
-        self.options_verify_ssl_label = QLabel()
-        self.options_verify_ssl_label.setText('Verify SSL')
+        self.options_verify_ssl_checkbox = QCheckBox('Verify SSL')
 
-        self.options_attach_cookies_checkbox = QCheckBox()
-        self.options_attach_cookies_checkbox.setStyleSheet("""
-QCheckBox::indicator {
-    width: 20px;
-    height: 20px;
-}
-""")
-        self.attach_cookies_label = QLabel()
-        self.attach_cookies_label.setText('Attach cookies (store and send)')
+        self.options_attach_cookies_checkbox = QCheckBox(
+            'Attach cookies (store and send)'
+        )
 
         options_first_line = QHBoxLayout()
         options_first_line.addWidget(self.options_timeout_label)
@@ -304,17 +275,14 @@ QCheckBox::indicator {
 
         options_second_line = QHBoxLayout()
         options_second_line.addWidget(self.options_follow_redirects_checkbox)
-        options_second_line.addWidget(self.options_follow_redirects_label)
         options_second_line.addStretch()
 
         options_third_line = QHBoxLayout()
         options_third_line.addWidget(self.options_verify_ssl_checkbox)
-        options_third_line.addWidget(self.options_verify_ssl_label)
         options_third_line.addStretch()
 
         options_fourth_line = QHBoxLayout()
         options_fourth_line.addWidget(self.options_attach_cookies_checkbox)
-        options_fourth_line.addWidget(self.attach_cookies_label)
         options_fourth_line.addStretch()
 
         options_layout = QVBoxLayout(options_tab)
@@ -413,37 +381,40 @@ QCheckBox::indicator {
         )
 
     def clear_data(self) -> None:
-        # Headers e Params
-        self.headers_dynamic_fields.clear_data()
-        self.params_dynamic_fields.clear_data()
+        with QSignalBlocker(self):
+            # Headers e Params
+            self.headers_dynamic_fields.clear_data()
+            self.params_dynamic_fields.clear_data()
 
-        # Auth
-        self.auth_enabled_checkbox.setChecked(False)
-        self.auth_mode_combobox.setCurrentText(AuthMode.BASIC)
-        self.auth_basic_username_input.setText('')
-        self.auth_basic_password_input.setText('')
-        self.auth_bearer_token_input.setText('')
-        self.auth_api_key_where_combobox.setCurrentText('header')
-        self.auth_api_key_key_input.setText('')
-        self.auth_api_key_value_input.setText('')
-        self.auth_digest_username_input.setText('')
-        self.auth_digest_password_input.setText('')
+            # Auth
+            self.auth_enabled_checkbox.setChecked(False)
+            self.auth_mode_combobox.setCurrentText(AuthMode.BASIC)
+            self.auth_basic_username_input.setText('')
+            self.auth_basic_password_input.setText('')
+            self.auth_bearer_token_input.setText('')
+            self.auth_api_key_where_combobox.setCurrentText('header')
+            self.auth_api_key_key_input.setText('')
+            self.auth_api_key_value_input.setText('')
+            self.auth_digest_username_input.setText('')
+            self.auth_digest_password_input.setText('')
 
-        # Body
-        self.body_enable_checkbox.setChecked(False)
-        self.body_mode_combobox.setCurrentText(BodyMode.RAW)
-        self.body_text_editor.set_text('')
-        self.body_raw_language_combobox.setCurrentText(BodyRawLanguage.PLAIN)
-        self.body_indent_size_combobox.setCurrentText('2')
-        self.file_input.clear()
-        self.urlencoded_dynamic_fields.clear_data()
-        self.multipart_dynamic_fields.clear_data()
+            # Body
+            self.body_enable_checkbox.setChecked(False)
+            self.body_mode_combobox.setCurrentText(BodyMode.RAW)
+            self.body_text_editor.set_text('')
+            self.body_raw_language_combobox.setCurrentText(
+                BodyRawLanguage.PLAIN
+            )
+            self.body_indent_size_combobox.setCurrentText('2')
+            self.file_input.clear()
+            self.urlencoded_dynamic_fields.clear_data()
+            self.multipart_dynamic_fields.clear_data()
 
-        # Options
-        self.options_timeout_input.clear()
-        self.options_follow_redirects_checkbox.setChecked(False)
-        self.options_verify_ssl_checkbox.setChecked(False)
-        self.options_attach_cookies_checkbox.setChecked(False)
+            # Options
+            self.options_timeout_input.clear()
+            self.options_follow_redirects_checkbox.setChecked(False)
+            self.options_verify_ssl_checkbox.setChecked(False)
+            self.options_attach_cookies_checkbox.setChecked(False)
 
     def get_data(self) -> dict:
         auth_enabled = self.auth_enabled_checkbox.isChecked()
@@ -525,80 +496,92 @@ QCheckBox::indicator {
         }
 
     def set_data(self, data: dict) -> None:
-        for field in data.get('headers', []):
-            self.headers_dynamic_fields.add_field(
-                TextDynamicField(
-                    enabled=field['enabled'],
-                    key=field['key'],
-                    value=field['value'],
-                )
-            )
-
-        for field in data.get('params', []):
-            self.params_dynamic_fields.add_field(
-                TextDynamicField(
-                    enabled=field['enabled'],
-                    key=field['key'],
-                    value=field['value'],
-                )
-            )
-
-        self.auth_enabled_checkbox.setChecked(data['auth_enabled'])
-        self.auth_mode_combobox.setCurrentText(data['auth_mode'])
-        if data['auth_mode'] == AuthMode.BASIC:
-            self.auth_basic_username_input.setText(data['auth']['username'])
-            self.auth_basic_password_input.setText(data['auth']['password'])
-        elif data['auth_mode'] == AuthMode.BEARER:
-            self.auth_bearer_token_input.setText(data['auth']['token'])
-        elif data['auth_mode'] == AuthMode.API_KEY:
-            self.auth_api_key_where_combobox.setCurrentText(
-                data['auth']['where']
-            )
-            self.auth_api_key_key_input.setText(data['auth']['key'])
-            self.auth_api_key_value_input.setText(data['auth']['value'])
-        elif data['auth_mode'] == AuthMode.DIGEST:
-            self.auth_digest_username_input.setText(data['auth']['username'])
-            self.auth_digestpassword_input.setText(data['auth']['password'])
-
-        self.body_enable_checkbox.setChecked(data['body_enabled'])
-        self.body_mode_combobox.setCurrentText(data['body_mode'])
-        if data['body_mode'] == BodyMode.RAW:
-            self.body_raw_language_combobox.setCurrentText(
-                data['body']['language']
-            )
-            self.body_text_editor.set_text(data['body']['value'])
-        elif data['body_mode'] == BodyMode.FILE:
-            self.file_input.setText(str(data['body']['file']))
-        elif data['body_mode'] == BodyMode.FORM_URLENCODED:
-            for field in data['body']['fields']:
-                self.urlencoded_dynamic_fields.add_field(
+        with QSignalBlocker(self):
+            for field in data.get('headers', []):
+                self.headers_dynamic_fields.add_field(
                     TextDynamicField(
                         enabled=field['enabled'],
                         key=field['key'],
                         value=field['value'],
                     )
                 )
-        elif data['body_mode'] == BodyMode.FORM_MULTIPART:
-            for field in data['body']['fields']:
-                self.multipart_dynamic_fields.add_field(
-                    TextOrFileDynamicField(
-                        value_kind=field['value_kind'],
+
+            for field in data.get('params', []):
+                self.params_dynamic_fields.add_field(
+                    TextDynamicField(
                         enabled=field['enabled'],
                         key=field['key'],
-                        value=str(field['value']) if field['value'] else '',
+                        value=field['value'],
                     )
                 )
 
-        self.options_timeout_input.setText(str(data['options']['timeout']))
-        self.options_follow_redirects_checkbox.setChecked(
-            data['options']['follow_redirects']
-        )
-        self.options_verify_ssl_checkbox.setChecked(
-            data['options']['verify_ssl']
-        )
-        self.options_attach_cookies_checkbox.setChecked(
-            data['options']['attach_cookies']
-        )
+            self.auth_enabled_checkbox.setChecked(data['auth_enabled'])
+            self.auth_mode_combobox.setCurrentText(data['auth_mode'])
+            if data['auth_mode'] == AuthMode.BASIC:
+                self.auth_basic_username_input.setText(
+                    data['auth']['username']
+                )
+                self.auth_basic_password_input.setText(
+                    data['auth']['password']
+                )
+            elif data['auth_mode'] == AuthMode.BEARER:
+                self.auth_bearer_token_input.setText(data['auth']['token'])
+            elif data['auth_mode'] == AuthMode.API_KEY:
+                self.auth_api_key_where_combobox.setCurrentText(
+                    data['auth']['where']
+                )
+                self.auth_api_key_key_input.setText(data['auth']['key'])
+                self.auth_api_key_value_input.setText(data['auth']['value'])
+            elif data['auth_mode'] == AuthMode.DIGEST:
+                self.auth_digest_username_input.setText(
+                    data['auth']['username']
+                )
+                self.auth_digest_password_input.setText(
+                    data['auth']['password']
+                )
+
+            self.body_enable_checkbox.setChecked(data['body_enabled'])
+            self.body_mode_combobox.setCurrentText(data['body_mode'])
+            if data['body_mode'] == BodyMode.RAW:
+                self.body_raw_language_combobox.setCurrentText(
+                    data['body']['language']
+                )
+                self.body_text_editor.set_text(data['body']['value'])
+            elif data['body_mode'] == BodyMode.FILE:
+                self.file_input.setText(str(data['body']['file']))
+            elif data['body_mode'] == BodyMode.FORM_URLENCODED:
+                for field in data['body']['fields']:
+                    self.urlencoded_dynamic_fields.add_field(
+                        TextDynamicField(
+                            enabled=field['enabled'],
+                            key=field['key'],
+                            value=field['value'],
+                        )
+                    )
+            elif data['body_mode'] == BodyMode.FORM_MULTIPART:
+                for field in data['body']['fields']:
+                    self.multipart_dynamic_fields.add_field(
+                        TextOrFileDynamicField(
+                            value_kind=field['value_kind'],
+                            enabled=field['enabled'],
+                            key=field['key'],
+                            value=str(field['value'])
+                            if field['value']
+                            else '',
+                        )
+                    )
+
+            self.options_timeout_input.setText(str(data['options']['timeout']))
+            self.options_follow_redirects_checkbox.setChecked(
+                data['options']['follow_redirects']
+            )
+            self.options_verify_ssl_checkbox.setChecked(
+                data['options']['verify_ssl']
+            )
+            self.options_attach_cookies_checkbox.setChecked(
+                data['options']['attach_cookies']
+            )
+        self.sig_seted_data.emit()
 
     def _on_body_raw_language_changed(self, text_type: str) -> None:
         self.body_text_editor.set_language(language=text_type)

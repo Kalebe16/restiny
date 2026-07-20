@@ -38,7 +38,6 @@ def safe_repo(func):
             if 'UNIQUE' in str(error):
                 return RepoResp(status=RepoStatus.DUPLICATED)
 
-            print(error)
             return RepoResp(status=RepoStatus.DB_ERROR)
 
     return wrapper
@@ -88,7 +87,14 @@ class SQLRepoBase(ABC):
 class FoldersSQLRepo(SQLRepoBase):
     @property
     def _updatable_sql_fields(self) -> list[str]:
-        return [SQLFolder.parent_id.key, SQLFolder.name.key]
+        return [
+            SQLFolder.parent_id.key,
+            SQLFolder.name.key,
+            SQLFolder.auth_mode.key,
+            SQLFolder.auth.key,
+            SQLFolder.headers.key,
+            SQLFolder.documentation.key,
+        ]
 
     @safe_repo
     def get_by_parent_id(
@@ -179,6 +185,10 @@ class FoldersSQLRepo(SQLRepoBase):
             uuid=sql_folder.uuid,
             parent_id=sql_folder.parent_id,
             name=sql_folder.name,
+            headers=json.loads(sql_folder.headers),
+            auth_mode=sql_folder.auth_mode,
+            auth=json.loads(sql_folder.auth),
+            documentation=sql_folder.documentation,
             created_at=sql_folder.created_at.replace(tzinfo=UTC),
             updated_at=sql_folder.updated_at.replace(tzinfo=UTC),
         )
@@ -189,6 +199,12 @@ class FoldersSQLRepo(SQLRepoBase):
             uuid=str(folder.uuid),
             parent_id=folder.parent_id,
             name=folder.name,
+            headers=json.dumps(
+                [header.model_dump() for header in folder.headers]
+            ),
+            auth_mode=folder.auth_mode,
+            auth=json.dumps(folder.auth.model_dump(), default=str),
+            documentation=folder.documentation,
             created_at=folder.created_at,
             updated_at=folder.updated_at,
         )
@@ -482,10 +498,7 @@ class SettingsSQLRepo(SQLRepoBase):
     @safe_repo
     def get(self, session: Session | None = None) -> RepoResp[Settings]:
         with self._ensure_session(session) as session:
-            try:
-                sql_settings = session.scalar(select(SQLSettings).limit(1))
-            except Exception as error:
-                print(error)
+            sql_settings = session.scalar(select(SQLSettings).limit(1))
             if not sql_settings:
                 return RepoResp(data=Settings())
 
