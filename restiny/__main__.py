@@ -134,7 +134,7 @@ def show_requirements_popup() -> None:
     root.protocol('WM_DELETE_WINDOW', lambda: on_close(root))
 
     label = tk.Label(
-        root, text='Maybe required system libraries are not installed'
+        root, text='Maybe some required system requirements are missing'
     )
     label.pack(expand=True, fill='both', padx=12, pady=12)
 
