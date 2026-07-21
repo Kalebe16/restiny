@@ -196,7 +196,7 @@ class Request(BaseModel):
         ]
 
         resolved_params = [
-            self.Param(
+            Param(
                 enabled=param.enabled,
                 key=_resolve_variables(param.key),
                 value=_resolve_variables(param.value),
@@ -297,7 +297,7 @@ class Request(BaseModel):
         if not self.body_enabled:
             request = httpx_client.build_request(
                 method=self.method,
-                url=self.url,
+                url=url,
                 headers=headers,
                 params=params,
             )

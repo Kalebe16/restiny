@@ -26,6 +26,36 @@ from restiny.widgets.dynamic_fields import (
 )
 from restiny.widgets.password_input import PasswordInput
 
+COMMON_HEADERS = [
+    'Accept',
+    'Accept-Encoding',
+    'Accept-Language',
+    'Authorization',
+    'Cache-Control',
+    'Cookie',
+    'Host',
+    'Origin',
+    'Referer',
+    'User-Agent',
+    'If-Modified-Since',
+    'If-None-Match',
+    'Access-Control-Allow-Origin',
+    'Access-Control-Allow-Methods',
+    'Access-Control-Allow-Headers',
+    'Content-Disposition',
+    'Content-Encoding',
+    'Content-Type',
+    'Content-Length',
+    'ETag',
+    'Expires',
+    'Last-Modified',
+    'Location',
+    'Set-Cookie',
+    'Strict-Transport-Security',
+    'Content-Security-Policy',
+    'X-Content-Type-Options',
+]
+
 
 class RequestArea(QWidget):
     sig_edited = Signal()
@@ -44,7 +74,7 @@ class RequestArea(QWidget):
 
         # Headers tab
         self.headers_dynamic_fields = DynamicFields(
-            fields=[TextDynamicField()]
+            fields=[TextDynamicField()], completer_words=COMMON_HEADERS
         )
 
         headers_layout = QVBoxLayout(headers_tab)

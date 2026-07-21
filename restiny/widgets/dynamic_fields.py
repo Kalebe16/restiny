@@ -4,6 +4,7 @@ from typing import Literal
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
+    QCompleter,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -252,10 +253,11 @@ class DynamicFields(QWidget):
     def __init__(
         self,
         fields: list[TextDynamicField | TextOrFileDynamicField],
+        completer_words: list[str] | None = None,
     ) -> None:
         super().__init__()
-
         self.initial_fields = fields
+        self.completer_words = completer_words
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
@@ -303,6 +305,13 @@ class DynamicFields(QWidget):
         )
         field.sig_remove_requested.connect(lambda: self.remove_field(field))
         field.sig_edited.connect(lambda: self.sig_edited.emit())
+
+        if self.completer_words:
+            completer = QCompleter(self.completer_words)
+            completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+            completer.setFilterMode(Qt.MatchContains)
+            field.key_input.setCompleter(completer)
+
         if self.fields and self.fields[-1].is_empty:
             self.layout.insertWidget(self.layout.count() - 1, field)
         else:

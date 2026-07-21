@@ -60,6 +60,17 @@ jobs:
             --collect-data qtmonaco \
             --add-data "restiny/data/sql:data/sql" \
             --add-data "restiny/assets:assets" \
+            --hidden-import "pymdownx.superfences" \
+            --hidden-import "pymdownx.highlight" \
+            --hidden-import "pymdownx.inlinehilite" \
+            --hidden-import "pymdownx.tasklist" \
+            --hidden-import "pymdownx.tilde" \
+            --hidden-import "pymdownx.mark" \
+            --hidden-import "pymdownx.keys" \
+            --hidden-import "pymdownx.caret" \
+            --hidden-import "pymdownx.details" \
+            --hidden-import "pymdownx.smartsymbols" \
+            --hidden-import "pymdownx.emoji" \
             ./restiny/__main__.py
 
       - name: Upload executables

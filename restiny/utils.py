@@ -64,16 +64,6 @@ def open_darwin_terminal(command: str) -> None:
     )
 
 
-def open_windows_terminal(command: str) -> None:
-    subprocess.Popen(
-        [
-            'cmd',
-            '/k',
-            command,
-        ]
-    )
-
-
 def build_curl_cmd(
     method: str,
     url: str,
