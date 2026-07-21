@@ -67,12 +67,14 @@ def open_linux_terminal(command: str) -> None:
 
 
 def open_darwin_terminal(command: str) -> None:
+    escaped_command = command.replace('\\', '\\\\').replace('"', '\\"')
     subprocess.Popen(
         [
-            'open',
-            '-a',
-            'Terminal',
-            command,
+            'osascript',
+            '-e',
+            (f'tell application "Terminal" to do script "{escaped_command}"'),
+            '-e',
+            'tell application "Terminal" to activate',
         ]
     )
 

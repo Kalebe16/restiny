@@ -310,8 +310,7 @@ class DynamicFields(QWidget):
             completer = QCompleter(self.completer_words)
             completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
             completer.setFilterMode(Qt.MatchContains)
-            for field in self.fields:
-                field.key_input.setCompleter(completer)
+            field.key_input.setCompleter(completer)
 
         if self.fields and self.fields[-1].is_empty:
             self.layout.insertWidget(self.layout.count() - 1, field)
