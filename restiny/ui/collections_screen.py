@@ -998,7 +998,7 @@ class CollectionsScreen(QWidget):
             error_message = str(error)
             msg = QMessageBox(self)
             msg.setIcon(QMessageBox.Critical)
-            msg.setWindowTitle('Request error')
+            msg.setWindowTitle('Error')
             if error_message:
                 msg.setText(f'{error_name}: {error_message}')
             else:

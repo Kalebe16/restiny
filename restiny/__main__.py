@@ -7,24 +7,6 @@ import tkinter as tk
 import webbrowser
 from tkinter import messagebox
 
-import qasync
-from PySide6.QtWidgets import QApplication
-
-from restiny.data.db import DBManager
-from restiny.data.repos import (
-    EnvironmentsSQLRepo,
-    FoldersSQLRepo,
-    RequestsSQLRepo,
-    SettingsSQLRepo,
-)
-from restiny.themes import dark, light
-from restiny.ui.app import MainWindow
-from restiny.utils import (
-    fix_pyside_stylesheet,
-    open_darwin_terminal,
-    open_linux_terminal,
-)
-
 
 def get_real_python():
     if not getattr(sys, 'frozen', False):
@@ -61,40 +43,94 @@ def monkey_patch() -> None:
     subprocess.Popen = patched_popen
 
 
+def open_linux_terminal(command: str) -> None:
+    terminals = [
+        ('gnome-terminal', ['--', 'bash', '-c']),
+        ('ptyxis', ['--', 'bash', '-c']),
+        ('kgx', ['--', 'bash', '-c']),
+        ('konsole', ['-e', 'bash', '-c']),
+        ('xfce4-terminal', ['-e', 'bash', '-c']),
+        ('mate-terminal', ['-e', 'bash', '-c']),
+        ('lxterminal', ['-e', 'bash', '-c']),
+        ('tilix', ['-e', 'bash', '-c']),
+        ('terminator', ['-x', 'bash', '-c']),
+        ('alacritty', ['-e', 'bash', '-c']),
+        ('kitty', ['bash', '-c']),
+        ('wezterm', ['start', '--', 'bash', '-c']),
+        ('xterm', ['-e', 'bash', '-c']),
+        ('x-terminal-emulator', ['-e', 'bash', '-c']),
+    ]
+    for terminal, args in terminals:
+        if shutil.which(terminal):
+            subprocess.Popen([terminal, *args, f'{command}; exec bash'])
+            return
+
+
+def open_darwin_terminal(command: str) -> None:
+    subprocess.Popen(
+        [
+            'open',
+            '-a',
+            'Terminal',
+            command,
+        ]
+    )
+
+
 def show_requirements_popup() -> None:
     def install_requirements(root: tk.Tk) -> None:
         system = platform.system()
         if system == 'Linux':
             if shutil.which('apt'):
                 command = (
-                    'sudo apt update && sudo apt install -y '
-                    'libxcb1 libxcb-cursor0 libxcb-xinerama0 '
-                    'libxkbcommon-x11-0 libgl1 libegl1 '
-                    'libnss3 libasound2'
+                    'sudo apt install -y libxcb1; '
+                    'sudo apt install -y libxcb-cursor0; '
+                    'sudo apt install -y libxcb-xinerama0; '
+                    'sudo apt install -y libxkbcommon-x11-0; '
+                    'sudo apt install -y libgl1; '
+                    'sudo apt install -y libegl1; '
+                    'sudo apt install -y libnss3; '
+                    'sudo apt install -y libasound2t64; '
+                    'sudo apt install -y libasound2'
                 )
             elif shutil.which('dnf'):
                 command = (
-                    'sudo dnf install -y '
-                    'libxcb xcb-util-cursor libxkbcommon-x11 '
-                    'mesa-libGL mesa-libEGL nss alsa-lib'
+                    'sudo dnf install -y libxcb; '
+                    'sudo dnf install -y xcb-util-cursor; '
+                    'sudo dnf install -y libxkbcommon-x11; '
+                    'sudo dnf install -y mesa-libGL; '
+                    'sudo dnf install -y mesa-libEGL; '
+                    'sudo dnf install -y nss; '
+                    'sudo dnf install -y alsa-lib'
                 )
             elif shutil.which('yum'):
                 command = (
-                    'sudo yum install -y '
-                    'libxcb xcb-util-cursor libxkbcommon-x11 '
-                    'mesa-libGL mesa-libEGL nss alsa-lib'
+                    'sudo yum install -y libxcb; '
+                    'sudo yum install -y xcb-util-cursor; '
+                    'sudo yum install -y libxkbcommon-x11; '
+                    'sudo yum install -y mesa-libGL; '
+                    'sudo yum install -y mesa-libEGL; '
+                    'sudo yum install -y nss; '
+                    'sudo yum install -y alsa-lib'
                 )
             elif shutil.which('pacman'):
                 command = (
-                    'sudo pacman -Syu --needed '
-                    'libxcb xcb-util-cursor libxkbcommon-x11 '
-                    'mesa nss alsa-lib'
+                    'sudo pacman -Syu --needed libxcb; '
+                    'sudo pacman -S --needed xcb-util-cursor; '
+                    'sudo pacman -S --needed libxkbcommon-x11; '
+                    'sudo pacman -S --needed mesa; '
+                    'sudo pacman -S --needed nss; '
+                    'sudo pacman -S --needed alsa-lib'
                 )
             elif shutil.which('zypper'):
                 command = (
-                    'sudo zypper install -y '
-                    'libxcb1 libxcb-cursor0 libxkbcommon-x11-0 '
-                    'Mesa-libGL1 Mesa-libEGL1 mozilla-nss alsa'
+                    'sudo zypper install -y libxcb1; '
+                    'sudo zypper install -y libxcb-cursor0; '
+                    'sudo zypper install -y libxkbcommon-x11-0; '
+                    'sudo zypper install -y Mesa-libGL1; '
+                    'sudo zypper install -y Mesa-libEGL1; '
+                    'sudo zypper install -y mozilla-nss; '
+                    'sudo zypper install -y alsa'
                 )
             else:
                 messagebox.showerror(
@@ -106,7 +142,6 @@ def show_requirements_popup() -> None:
                     parent=root,
                 )
                 return
-
             open_linux_terminal(command=command)
         elif system == 'Darwin':
             command = (
@@ -155,6 +190,22 @@ def show_requirements_popup() -> None:
 
 
 def main() -> None:
+    import qasync
+    from PySide6.QtWidgets import QApplication
+
+    from restiny.data.db import DBManager
+    from restiny.data.repos import (
+        EnvironmentsSQLRepo,
+        FoldersSQLRepo,
+        RequestsSQLRepo,
+        SettingsSQLRepo,
+    )
+    from restiny.themes import dark, light
+    from restiny.ui.app import MainWindow
+    from restiny.utils import (
+        fix_pyside_stylesheet,
+    )
+
     app = QApplication(sys.argv)
     loop = qasync.QEventLoop(app)
     asyncio.set_event_loop(loop)
