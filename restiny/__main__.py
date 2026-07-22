@@ -1,11 +1,31 @@
 import asyncio
+import os
 import platform
 import shutil
 import subprocess
 import sys
+import threading
 import tkinter as tk
 import webbrowser
 from tkinter import messagebox
+from tkinter.scrolledtext import ScrolledText
+
+import qasync
+from PySide6.QtWidgets import QApplication
+
+from restiny.data.db import DBManager
+from restiny.data.repos import (
+    EnvironmentsSQLRepo,
+    FoldersSQLRepo,
+    RequestsSQLRepo,
+    SettingsSQLRepo,
+)
+from restiny.themes import dark, light
+from restiny.ui.app import MainWindow
+from restiny.utils import (
+    fix_pyside_stylesheet,
+    has_root_privileges,
+)
 
 
 def get_real_python():
@@ -43,97 +63,107 @@ def monkey_patch() -> None:
     subprocess.Popen = patched_popen
 
 
-def open_linux_terminal(command: str) -> None:
-    terminals = [
-        ('gnome-terminal', ['--', 'bash', '-c']),
-        ('ptyxis', ['--', 'bash', '-c']),
-        ('kgx', ['--', 'bash', '-c']),
-        ('konsole', ['-e', 'bash', '-c']),
-        ('xfce4-terminal', ['-e', 'bash', '-c']),
-        ('mate-terminal', ['-e', 'bash', '-c']),
-        ('lxterminal', ['-e', 'bash', '-c']),
-        ('tilix', ['-e', 'bash', '-c']),
-        ('terminator', ['-x', 'bash', '-c']),
-        ('alacritty', ['-e', 'bash', '-c']),
-        ('kitty', ['bash', '-c']),
-        ('wezterm', ['start', '--', 'bash', '-c']),
-        ('xterm', ['-e', 'bash', '-c']),
-        ('x-terminal-emulator', ['-e', 'bash', '-c']),
-    ]
-    for terminal, args in terminals:
-        if shutil.which(terminal):
-            subprocess.Popen([terminal, *args, f'{command}; exec bash'])
-            return
+def run_commands_modal(parent: tk.Tk, commands: list[str]):
+    def run_commands_in_thread(log: ScrolledText, commands: list[str]):
+        log.tag_config(
+            'command', foreground='blue', font=('TkDefaultFont', 10, 'bold')
+        )
+        log.tag_config('stdout', foreground='green')
+        log.tag_config(
+            'stderr', foreground='red', font=('TkDefaultFont', 10, 'italic')
+        )
+        log.tag_config('finished', foreground='gray')
 
+        for cmd in commands:
+            log.insert('end', f'>>> {cmd}\n', 'command')
 
-def open_darwin_terminal(command: str) -> None:
-    escaped_command = command.replace('\\', '\\\\').replace('"', '\\"')
-    subprocess.Popen(
-        [
-            'osascript',
-            '-e',
-            (f'tell application "Terminal" to do script "{escaped_command}"'),
-            '-e',
-            'tell application "Terminal" to activate',
-        ]
+            result = subprocess.run(
+                cmd, shell=True, capture_output=True, text=True
+            )
+            if result.stdout:
+                log.insert('end', f'{result.stdout}\n', 'stdout')
+            if result.stderr:
+                log.insert('end', f'{result.stderr}\n', 'stderr')
+
+        log.insert('end', '[All commands finished]', 'finished')
+        log.see('end')
+
+    modal = tk.Toplevel(parent)
+    modal.title('Installing requirements')
+    modal.geometry('700x400')
+
+    log = ScrolledText(modal, height=20, width=80)
+    log.pack(expand=True, fill='both', padx=10, pady=10)
+
+    thread = threading.Thread(
+        target=lambda: run_commands_in_thread(log=log, commands=commands)
     )
+    thread.start()
 
 
 def show_requirements_popup() -> None:
     def install_requirements(root: tk.Tk) -> None:
         system = platform.system()
         if system == 'Linux':
+            if not has_root_privileges():
+                messagebox.showwarning(
+                    'Permissions required',
+                    'To install requirements, please run this program with root/administrator privileges.',
+                    parent=root,
+                )
+                return
+
             if shutil.which('apt'):
-                command = (
-                    'sudo apt install -y libxcb1; '
-                    'sudo apt install -y libxcb-cursor0; '
-                    'sudo apt install -y libxcb-xinerama0; '
-                    'sudo apt install -y libxkbcommon-x11-0; '
-                    'sudo apt install -y libgl1; '
-                    'sudo apt install -y libegl1; '
-                    'sudo apt install -y libnss3; '
-                    'sudo apt install -y libasound2t64; '
-                    'sudo apt install -y libasound2'
-                )
+                commands = [
+                    'apt install -y libxcb1',
+                    'apt install -y libxcb-cursor0',
+                    'apt install -y libxcb-xinerama0',
+                    'apt install -y libxkbcommon-x11-0',
+                    'apt install -y libgl1',
+                    'apt install -y libegl1',
+                    'apt install -y libnss3',
+                    'apt install -y libasound2t64',
+                    'apt install -y libasound2',
+                ]
             elif shutil.which('dnf'):
-                command = (
-                    'sudo dnf install -y libxcb; '
-                    'sudo dnf install -y xcb-util-cursor; '
-                    'sudo dnf install -y libxkbcommon-x11; '
-                    'sudo dnf install -y mesa-libGL; '
-                    'sudo dnf install -y mesa-libEGL; '
-                    'sudo dnf install -y nss; '
-                    'sudo dnf install -y alsa-lib'
-                )
+                commands = [
+                    'dnf install -y libxcb',
+                    'dnf install -y xcb-util-cursor',
+                    'dnf install -y libxkbcommon-x11',
+                    'dnf install -y mesa-libGL',
+                    'dnf install -y mesa-libEGL',
+                    'dnf install -y nss',
+                    'dnf install -y alsa-lib',
+                ]
             elif shutil.which('yum'):
-                command = (
-                    'sudo yum install -y libxcb; '
-                    'sudo yum install -y xcb-util-cursor; '
-                    'sudo yum install -y libxkbcommon-x11; '
-                    'sudo yum install -y mesa-libGL; '
-                    'sudo yum install -y mesa-libEGL; '
-                    'sudo yum install -y nss; '
-                    'sudo yum install -y alsa-lib'
-                )
+                commands = [
+                    'yum install -y libxcb',
+                    'yum install -y xcb-util-cursor',
+                    'yum install -y libxkbcommon-x11',
+                    'yum install -y mesa-libGL',
+                    'yum install -y mesa-libEGL',
+                    'yum install -y nss',
+                    'yum install -y alsa-lib',
+                ]
             elif shutil.which('pacman'):
-                command = (
-                    'sudo pacman -Syu --needed libxcb; '
-                    'sudo pacman -S --needed xcb-util-cursor; '
-                    'sudo pacman -S --needed libxkbcommon-x11; '
-                    'sudo pacman -S --needed mesa; '
-                    'sudo pacman -S --needed nss; '
-                    'sudo pacman -S --needed alsa-lib'
-                )
+                commands = [
+                    'pacman -Syu --needed libxcb',
+                    'pacman -S --needed xcb-util-cursor',
+                    'pacman -S --needed libxkbcommon-x11',
+                    'pacman -S --needed mesa',
+                    'pacman -S --needed nss',
+                    'pacman -S --needed alsa-lib',
+                ]
             elif shutil.which('zypper'):
-                command = (
-                    'sudo zypper install -y libxcb1; '
-                    'sudo zypper install -y libxcb-cursor0; '
-                    'sudo zypper install -y libxkbcommon-x11-0; '
-                    'sudo zypper install -y Mesa-libGL1; '
-                    'sudo zypper install -y Mesa-libEGL1; '
-                    'sudo zypper install -y mozilla-nss; '
-                    'sudo zypper install -y alsa'
-                )
+                commands = [
+                    'zypper install -y libxcb1',
+                    'zypper install -y libxcb-cursor0',
+                    'zypper install -y libxkbcommon-x11-0',
+                    'zypper install -y Mesa-libGL1',
+                    'zypper install -y Mesa-libEGL1',
+                    'zypper install -y mozilla-nss',
+                    'zypper install -y alsa',
+                ]
             else:
                 messagebox.showerror(
                     'Unsupported distribution',
@@ -144,12 +174,22 @@ def show_requirements_popup() -> None:
                     parent=root,
                 )
                 return
-            open_linux_terminal(command=command)
+            run_commands_modal(parent=root, commands=commands)
         elif system == 'Darwin':
-            command = (
-                'xcode-select --install; brew install freetype fontconfig'
-            )
-            open_darwin_terminal(command=command)
+            if not has_root_privileges():
+                messagebox.showwarning(
+                    'Permissions required',
+                    'To install requirements, please run this program with root/administrator privileges.',
+                    parent=root,
+                )
+                return
+
+            commands = [
+                'xcode-select --install',
+                'brew install freetype',
+                'brew install fontconfig',
+            ]
+            run_commands_modal(parent=root, commands=commands)
         elif system == 'Windows':
             webbrowser.open(
                 'https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version'
@@ -192,21 +232,8 @@ def show_requirements_popup() -> None:
 
 
 def main() -> None:
-    import qasync
-    from PySide6.QtWidgets import QApplication
-
-    from restiny.data.db import DBManager
-    from restiny.data.repos import (
-        EnvironmentsSQLRepo,
-        FoldersSQLRepo,
-        RequestsSQLRepo,
-        SettingsSQLRepo,
-    )
-    from restiny.themes import dark, light
-    from restiny.ui.app import MainWindow
-    from restiny.utils import (
-        fix_pyside_stylesheet,
-    )
+    if has_root_privileges():
+        os.environ['QTWEBENGINE_CHROMIUM_FLAGS'] = '--no-sandbox'
 
     app = QApplication(sys.argv)
     loop = qasync.QEventLoop(app)
