@@ -1,3 +1,6 @@
+import ctypes
+import os
+import platform
 import shlex
 import shutil
 import subprocess
@@ -11,6 +14,15 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QPushButton,
 )
+
+
+def has_root_privileges() -> bool:
+    system = platform.system()
+    if system in ('Linux', 'Darwin'):
+        return os.geteuid() == 0
+    elif system == 'Windows':
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    return False
 
 
 def fix_pyside_stylesheet(window: QMainWindow, accent_color: str) -> None:
