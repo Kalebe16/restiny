@@ -5,10 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.5.0] - 2026-07-22
+
+### Changed
+- More improves system requirements setup
+
 ## [1.4.0] - 2026-07-22
 
 ### Changed
-- Improves automatic requirements setup
+- Improves system requirements setup
 
 ## [1.3.0] - 2026-07-21
 

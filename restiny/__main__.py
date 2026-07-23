@@ -127,15 +127,15 @@ def show_requirements_popup() -> None:
 
             if shutil.which('apt'):
                 commands = [
-                    'apt install -y libxcb1',
-                    'apt install -y libxcb-cursor0',
-                    'apt install -y libxcb-xinerama0',
-                    'apt install -y libxkbcommon-x11-0',
-                    'apt install -y libgl1',
-                    'apt install -y libegl1',
-                    'apt install -y libnss3',
-                    'apt install -y libasound2t64',
-                    'apt install -y libasound2',
+                    'DEBIAN_FRONTEND=noninteractive apt install -y libxcb1',
+                    'DEBIAN_FRONTEND=noninteractive apt install -y libxcb-cursor0',
+                    'DEBIAN_FRONTEND=noninteractive apt install -y libxcb-xinerama0',
+                    'DEBIAN_FRONTEND=noninteractive apt install -y libxkbcommon-x11-0',
+                    'DEBIAN_FRONTEND=noninteractive apt install -y libgl1',
+                    'DEBIAN_FRONTEND=noninteractive apt install -y libegl1',
+                    'DEBIAN_FRONTEND=noninteractive apt install -y libnss3',
+                    'DEBIAN_FRONTEND=noninteractive apt install -y libasound2t64',
+                    'DEBIAN_FRONTEND=noninteractive apt install -y libasound2',
                 ]
             elif shutil.which('dnf'):
                 commands = [
@@ -159,22 +159,22 @@ def show_requirements_popup() -> None:
                 ]
             elif shutil.which('pacman'):
                 commands = [
-                    'pacman -Syu --needed libxcb',
-                    'pacman -S --needed xcb-util-cursor',
-                    'pacman -S --needed libxkbcommon-x11',
-                    'pacman -S --needed mesa',
-                    'pacman -S --needed nss',
-                    'pacman -S --needed alsa-lib',
+                    'pacman -Syu --needed --noconfirm libxcb',
+                    'pacman -S --needed --noconfirm xcb-util-cursor',
+                    'pacman -S --needed --noconfirm libxkbcommon-x11',
+                    'pacman -S --needed --noconfirm mesa',
+                    'pacman -S --needed --noconfirm nss',
+                    'pacman -S --needed --noconfirm alsa-lib',
                 ]
             elif shutil.which('zypper'):
                 commands = [
-                    'zypper install -y libxcb1',
-                    'zypper install -y libxcb-cursor0',
-                    'zypper install -y libxkbcommon-x11-0',
-                    'zypper install -y Mesa-libGL1',
-                    'zypper install -y Mesa-libEGL1',
-                    'zypper install -y mozilla-nss',
-                    'zypper install -y alsa',
+                    'zypper --non-interactive install -y libxcb1',
+                    'zypper --non-interactive install -y libxcb-cursor0',
+                    'zypper --non-interactive install -y libxkbcommon-x11-0',
+                    'zypper --non-interactive install -y Mesa-libGL1',
+                    'zypper --non-interactive install -y Mesa-libEGL1',
+                    'zypper --non-interactive install -y mozilla-nss',
+                    'zypper --non-interactive install -y alsa',
                 ]
             else:
                 messagebox.showerror(
