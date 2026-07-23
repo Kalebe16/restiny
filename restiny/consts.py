@@ -13,8 +13,3 @@ CONF_DIR = HOME_DIR / '.restiny'
 CONF_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_FILE = CONF_DIR / 'restiny.1.sqlite3'
-
-DOWNLOADS_DIR = HOME_DIR / 'Downloads'
-if not DOWNLOADS_DIR.exists():
-    DOWNLOADS_DIR = CONF_DIR / 'downloads'
-    DOWNLOADS_DIR.mkdir()
