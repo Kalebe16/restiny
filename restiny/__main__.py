@@ -24,7 +24,7 @@ from restiny.themes import dark, light
 from restiny.ui.app import MainWindow
 from restiny.utils import (
     fix_pyside_stylesheet,
-    has_root_privileges,
+    is_root,
 )
 
 
@@ -76,16 +76,28 @@ def run_commands_modal(parent: tk.Tk, commands: list[str]):
 
         for cmd in commands:
             log.insert('end', f'>>> {cmd}\n', 'command')
+            log.see('end')
 
-            result = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True
+            process = subprocess.Popen(
+                cmd,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
             )
-            if result.stdout:
-                log.insert('end', f'{result.stdout}\n', 'stdout')
-            if result.stderr:
-                log.insert('end', f'{result.stderr}\n', 'stderr')
 
-        log.insert('end', '[All commands finished]', 'finished')
+            for line in process.stdout:
+                log.insert('end', line, 'stdout')
+                log.see('end')
+
+            for line in process.stderr:
+                log.insert('end', line, 'stderr')
+                log.see('end')
+
+            process.wait()
+
+        log.insert('end', '[All commands finished]\n', 'finished')
         log.see('end')
 
     modal = tk.Toplevel(parent)
@@ -105,7 +117,7 @@ def show_requirements_popup() -> None:
     def install_requirements(root: tk.Tk) -> None:
         system = platform.system()
         if system == 'Linux':
-            if not has_root_privileges():
+            if not is_root():
                 messagebox.showwarning(
                     'Permissions required',
                     'To install requirements, please run this program with root/administrator privileges.',
@@ -176,7 +188,7 @@ def show_requirements_popup() -> None:
                 return
             run_commands_modal(parent=root, commands=commands)
         elif system == 'Darwin':
-            if not has_root_privileges():
+            if not is_root():
                 messagebox.showwarning(
                     'Permissions required',
                     'To install requirements, please run this program with root/administrator privileges.',
@@ -221,7 +233,7 @@ def show_requirements_popup() -> None:
     tk.Button(
         buttons,
         text='Try run app',
-        command=root.destroy,
+        command=lambda: root.destroy(),
     ).pack(side='right')
     tk.Button(
         buttons,
@@ -232,7 +244,7 @@ def show_requirements_popup() -> None:
 
 
 def main() -> None:
-    if has_root_privileges():
+    if is_root():
         os.environ['QTWEBENGINE_CHROMIUM_FLAGS'] = '--no-sandbox'
 
     app = QApplication(sys.argv)

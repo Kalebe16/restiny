@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 
-def has_root_privileges() -> bool:
+def is_root() -> bool:
     system = platform.system()
     if system in ('Linux', 'Darwin'):
         return os.geteuid() == 0

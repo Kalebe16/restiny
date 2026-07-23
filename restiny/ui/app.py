@@ -1,3 +1,4 @@
+import getpass
 import json
 import webbrowser
 from datetime import UTC, date, datetime
@@ -419,7 +420,7 @@ class MainWindow(QMainWindow):
         self.settings_repo = settings_repo
 
         self.setWindowTitle(
-            f'RESTiny {__version__} - Minimal HTTP client, no bullshit'
+            f'RESTiny {__version__} - Minimal HTTP client, no bullshit (@{getpass.getuser()})'
         )
         self.setWindowIcon(QIcon(str(APP_ICON)))
         self.resize(1400, 800)
